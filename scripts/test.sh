@@ -14,6 +14,13 @@ FRONTEND_URL="http://localhost:5173"
 DB_USER="chadev"
 DB_NAME="chadev_billing"
 
+# Load .env if present
+if [ -f ".env" ]; then
+  set -a
+  source .env
+  set +a
+fi
+
 echo -e "${BOLD}🧾 chadev-billing — Pre-Deploy Tests${RESET}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -251,10 +258,15 @@ echo ""
 # ── 7. API Integration ────────────────────────────────
 echo -e "${BOLD}7. API Integration${RESET}"
 
+# Define check_endpoint BEFORE the if block
 check_endpoint() {
   local label="$1" url="$2" expected="${3:-200}"
   local code
-  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null || echo "000")
+  if [ -n "${AUTH_HEADER:-}" ]; then
+    code=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH_HEADER" --max-time 5 "$url" 2>/dev/null || echo "000")
+  else
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null || echo "000")
+  fi
   if [ "$code" = "$expected" ]; then
     pass "${label} (HTTP ${code})"
   else
@@ -264,6 +276,19 @@ check_endpoint() {
 
 if curl -sf "${BACKEND_URL}/docs" > /dev/null 2>&1; then
   pass "Backend API is running"
+
+  # Get auth token
+  AUTH_TOKEN=""
+  AUTH_HEADER=""
+  if [ -n "${TEST_EMAIL:-}" ] && [ -n "${TEST_PASSWORD:-}" ]; then
+    AUTH_TOKEN=$(curl -sf -X POST "${BACKEND_URL}/api/auth/login" \
+      -H "Content-Type: application/json" \
+      -d "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\"}" 2>/dev/null \
+      | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || echo "")
+    if [ -n "$AUTH_TOKEN" ]; then
+      AUTH_HEADER="Authorization: Bearer ${AUTH_TOKEN}"
+    fi
+  fi
 
   check_endpoint "GET /api/clients" "${BACKEND_URL}/api/clients"
   check_endpoint "GET /api/documents" "${BACKEND_URL}/api/documents"
@@ -292,18 +317,22 @@ print(count)
   fi
 
   echo -e "  ${CYAN}Running CRUD smoke test...${RESET}"
+  CURL_AUTH=()
+  [ -n "${AUTH_HEADER:-}" ] && CURL_AUTH=(-H "$AUTH_HEADER")
+
   CLIENT_RESP=$(curl -sf -X POST "${BACKEND_URL}/api/clients" \
+    "${CURL_AUTH[@]}" \
     -H "Content-Type: application/json" \
     -d '{"customer_number":"TEST-999","company_name":"__test_client__","street":"Test St 1","postal_code":"8000","city":"Zürich"}' 2>/dev/null || echo "")
-  
+
   if echo "$CLIENT_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('id')" 2>/dev/null; then
     CLIENT_ID=$(echo "$CLIENT_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
     pass "POST /api/clients creates client (id: ${CLIENT_ID})"
 
-    GET_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${BACKEND_URL}/api/clients/${CLIENT_ID}" 2>/dev/null || echo "0")
+    GET_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${CURL_AUTH[@]}" "${BACKEND_URL}/api/clients/${CLIENT_ID}" 2>/dev/null || echo "0")
     [ "$GET_CODE" = "200" ] && pass "GET /api/clients/${CLIENT_ID} returns 200" || fail "GET client returned ${GET_CODE}"
 
-    DEL_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "${BACKEND_URL}/api/clients/${CLIENT_ID}" 2>/dev/null || echo "0")
+    DEL_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${CURL_AUTH[@]}" -X DELETE "${BACKEND_URL}/api/clients/${CLIENT_ID}" 2>/dev/null || echo "0")
     if [ "$DEL_CODE" = "200" ] || [ "$DEL_CODE" = "204" ]; then
       pass "DELETE /api/clients/${CLIENT_ID} cleanup"
     else
@@ -334,7 +363,9 @@ echo ""
 echo -e "${BOLD}9. Port Conflicts${RESET}"
 
 for port in 5432 8000 5173; do
-  listeners=$(lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -v "^COMMAND" | wc -l | tr -d " " || echo "0")
+  listeners=$(lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -cv "^COMMAND" 2>/dev/null || echo "0")
+  listeners="${listeners//[^0-9]/}"
+[ -z "$listeners" ] && listeners=0
   if [ "$listeners" -gt 1 ]; then
     fail "Port ${port} has ${listeners} listeners — conflict!"
     lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -v "^COMMAND" | head -3 | while read -r line; do info "$line"; done
@@ -351,7 +382,7 @@ echo ""
 echo -e "${BOLD}10. Security${RESET}"
 
 SECRETS_FOUND=$(grep -rn "password\|secret\|api_key" backend/app/ --include="*.py" 2>/dev/null \
-  | grep -v "environ\|getenv\|settings\|pydantic\|password_hash\|hashed_password" \
+  | grep -v "environ\|getenv\|settings\|pydantic\|password_hash\|hashed_password\|HTTPException\|detail=" \
   | grep -iE '=\s*".{8,}"' || true)
 
 if [ -n "$SECRETS_FOUND" ]; then

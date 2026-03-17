@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.auth import get_tenant_id
 from app.database import get_db
 from app.models.client import Client
 from app.schemas.client import ClientCreate, ClientRead, ClientUpdate
@@ -13,8 +14,9 @@ router = APIRouter(prefix="/api/clients", tags=["clients"])
 def list_clients(
     search: str | None = Query(None),
     db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
 ):
-    query = db.query(Client)
+    query = db.query(Client).filter(Client.tenant_id == tenant_id)
     if search:
         pattern = f"%{search}%"
         query = query.filter(
@@ -29,16 +31,16 @@ def list_clients(
 
 
 @router.get("/{client_id}", response_model=ClientRead)
-def get_client(client_id: int, db: Session = Depends(get_db)):
-    client = db.get(Client, client_id)
+def get_client(client_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    client = db.query(Client).filter(Client.id == client_id, Client.tenant_id == tenant_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     return client
 
 
 @router.post("", response_model=ClientRead, status_code=201)
-def create_client(data: ClientCreate, db: Session = Depends(get_db)):
-    client = Client(**data.model_dump())
+def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    client = Client(**data.model_dump(), tenant_id=tenant_id)
     db.add(client)
     db.commit()
     db.refresh(client)
@@ -46,8 +48,8 @@ def create_client(data: ClientCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{client_id}", response_model=ClientRead)
-def update_client(client_id: int, data: ClientUpdate, db: Session = Depends(get_db)):
-    client = db.get(Client, client_id)
+def update_client(client_id: int, data: ClientUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    client = db.query(Client).filter(Client.id == client_id, Client.tenant_id == tenant_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     for key, value in data.model_dump(exclude_unset=True).items():
@@ -58,8 +60,8 @@ def update_client(client_id: int, data: ClientUpdate, db: Session = Depends(get_
 
 
 @router.delete("/{client_id}", status_code=204)
-def delete_client(client_id: int, db: Session = Depends(get_db)):
-    client = db.get(Client, client_id)
+def delete_client(client_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    client = db.query(Client).filter(Client.id == client_id, Client.tenant_id == tenant_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     db.delete(client)

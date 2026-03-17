@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
+from app.auth import get_tenant_id
 from app.database import get_db
 from app.models.document import Document
 from app.models.line_item import LineItem
@@ -30,14 +31,36 @@ def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal
     return subtotal, discount_amount, total
 
 
+def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = False, with_client: bool = False) -> Document:
+    query = db.query(Document).filter(Document.id == doc_id, Document.tenant_id == tenant_id)
+    if with_items:
+        query = query.options(joinedload(Document.line_items))
+    if with_client:
+        query = query.options(joinedload(Document.client))
+    doc = query.first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+
+def _load_full(db: Session, doc_id: int, tenant_id: int) -> Document:
+    return (
+        db.query(Document)
+        .options(joinedload(Document.line_items), joinedload(Document.client))
+        .filter(Document.id == doc_id, Document.tenant_id == tenant_id)
+        .first()
+    )
+
+
 @router.get("", response_model=list[DocumentListRead])
 def list_documents(
     document_type: str | None = Query(None),
     status: str | None = Query(None),
     client_id: int | None = Query(None),
     db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
 ):
-    query = db.query(Document).options(joinedload(Document.client))
+    query = db.query(Document).options(joinedload(Document.client)).filter(Document.tenant_id == tenant_id)
     if document_type:
         query = query.filter(Document.document_type == document_type)
     if status:
@@ -48,30 +71,23 @@ def list_documents(
 
 
 @router.get("/{doc_id}", response_model=DocumentRead)
-def get_document(doc_id: int, db: Session = Depends(get_db)):
-    doc = (
-        db.query(Document)
-        .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id == doc_id)
-        .first()
-    )
+def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    doc = _load_full(db, doc_id, tenant_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
 
 @router.post("", response_model=DocumentRead, status_code=201)
-def create_document(data: DocumentCreate, db: Session = Depends(get_db)):
+def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc_data = data.model_dump(exclude={"line_items", "document_number"})
 
-    # Auto-generate document number if not provided
     doc_number = data.document_number
     if not doc_number:
         doc_number = generate_document_number(db, data.document_type)
 
-    doc = Document(**doc_data, document_number=doc_number)
+    doc = Document(**doc_data, document_number=doc_number, tenant_id=tenant_id)
 
-    # Calculate due_date from payment_terms_days
     if doc.due_date is None and doc.payment_terms_days:
         doc.due_date = doc.date + timedelta(days=doc.payment_terms_days)
 
@@ -84,7 +100,6 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db)):
 
     db.flush()
 
-    # Recalculate totals from the actual persisted line items
     items = db.query(LineItem).filter(LineItem.document_id == doc.id).all()
     subtotal, discount_amount, total = _recalc_totals(items, data.discount_percent)
     doc.subtotal = subtotal
@@ -92,27 +107,17 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db)):
     doc.total = total
 
     db.commit()
-    db.refresh(doc)
-
-    return (
-        db.query(Document)
-        .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id == doc.id)
-        .first()
-    )
+    return _load_full(db, doc.id, tenant_id)
 
 
 @router.put("/{doc_id}", response_model=DocumentRead)
-def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db)):
-    doc = db.get(Document, doc_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    doc = _get_doc(db, doc_id, tenant_id)
 
     update_data = data.model_dump(exclude_unset=True, exclude={"line_items"})
     for key, value in update_data.items():
         setattr(doc, key, value)
 
-    # Replace line items if provided
     if data.line_items is not None:
         db.query(LineItem).filter(LineItem.document_id == doc_id).delete()
         for item_data in data.line_items:
@@ -120,46 +125,29 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
             db.add(item)
         db.flush()
 
-        # Recalculate
         items = db.query(LineItem).filter(LineItem.document_id == doc_id).all()
         subtotal, discount_amount, total = _recalc_totals(items, doc.discount_percent)
         doc.subtotal = subtotal
         doc.discount_amount = discount_amount
         doc.total = total
 
-    # Recalculate due_date if date or payment_terms changed
     if "date" in update_data or "payment_terms_days" in update_data:
         doc.due_date = doc.date + timedelta(days=doc.payment_terms_days)
 
     db.commit()
-
-    return (
-        db.query(Document)
-        .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id == doc.id)
-        .first()
-    )
+    return _load_full(db, doc.id, tenant_id)
 
 
 @router.delete("/{doc_id}", status_code=204)
-def delete_document(doc_id: int, db: Session = Depends(get_db)):
-    doc = db.get(Document, doc_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+def delete_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    doc = _get_doc(db, doc_id, tenant_id)
     db.delete(doc)
     db.commit()
 
 
 @router.post("/{doc_id}/convert", response_model=DocumentRead)
-def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db)):
-    offerte = (
-        db.query(Document)
-        .options(joinedload(Document.line_items))
-        .filter(Document.id == doc_id)
-        .first()
-    )
-    if not offerte:
-        raise HTTPException(status_code=404, detail="Document not found")
+def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    offerte = _get_doc(db, doc_id, tenant_id, with_items=True)
     if offerte.document_type != "offerte":
         raise HTTPException(status_code=400, detail="Only Offerte documents can be converted")
 
@@ -169,6 +157,7 @@ def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db)):
         document_type="rechnung",
         document_number=doc_number,
         client_id=offerte.client_id,
+        tenant_id=tenant_id,
         date=offerte.date,
         due_date=offerte.due_date,
         payment_terms_days=offerte.payment_terms_days,
@@ -197,25 +186,18 @@ def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db)):
         db.add(new_item)
 
     db.commit()
-
-    return (
-        db.query(Document)
-        .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id == rechnung.id)
-        .first()
-    )
+    return _load_full(db, rechnung.id, tenant_id)
 
 
 @router.patch("/{doc_id}/status", response_model=DocumentRead)
-def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depends(get_db)):
-    doc = db.get(Document, doc_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    doc = _get_doc(db, doc_id, tenant_id)
 
     valid_statuses = {
         "offerte": {"draft", "sent", "accepted", "rejected", "cancelled"},
         "rechnung": {"draft", "sent", "paid", "overdue", "cancelled"},
     }
+
     if data.status not in valid_statuses.get(doc.document_type, set()):
         raise HTTPException(
             status_code=400,
@@ -224,28 +206,16 @@ def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depend
 
     doc.status = data.status
     db.commit()
-    db.refresh(doc)
-
-    return (
-        db.query(Document)
-        .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id == doc.id)
-        .first()
-    )
+    return _load_full(db, doc.id, tenant_id)
 
 
 @router.get("/{doc_id}/pdf")
-def download_pdf(doc_id: int, db: Session = Depends(get_db)):
-    doc = (
-        db.query(Document)
-        .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id == doc_id)
-        .first()
-    )
+def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    doc = _load_full(db, doc_id, tenant_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    settings = db.query(CompanySettings).first()
+    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
     if not settings:
         raise HTTPException(status_code=500, detail="Company settings not configured")
 

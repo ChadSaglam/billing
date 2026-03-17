@@ -1,71 +1,33 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+import type { Numeric } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number | string): string {
-  const n = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(n)) return '0.00 CHF';
-  const formatted = Math.abs(n)
-    .toFixed(2)
-    .replace(/\B(?=(\d{3})+(?!\d))/g, "'");
-  return n < 0 ? `-${formatted} CHF` : `${formatted} CHF`;
+export function toNum(value: Numeric): number {
+  return typeof value === "string" ? parseFloat(value) || 0 : value;
 }
 
-/** Coerce a value that may be a Decimal string from the API into a number */
-export function toNum(v: number | string | null | undefined): number {
-  if (v == null) return 0;
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  return isNaN(n) ? 0 : n;
+export function formatCurrency(value: Numeric, currency = "CHF"): string {
+  return `${currency} ${toNum(value).toLocaleString("de-CH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
-export function formatDate(date: string): string {
-  if (!date) return '';
-  const d = new Date(date);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}.${month}.${year}`;
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("de-CH");
 }
 
-export function getStatusColor(status: string): string {
-  switch (status) {
-    case 'draft':
-      return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
-    case 'sent':
-      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
-    case 'accepted':
-    case 'paid':
-      return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
-    case 'rejected':
-    case 'overdue':
-      return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
-    case 'cancelled':
-      return 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500';
-    default:
-      return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
-  }
-}
-
-export function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'draft':
-      return 'Draft';
-    case 'sent':
-      return 'Sent';
-    case 'accepted':
-      return 'Accepted';
-    case 'rejected':
-      return 'Rejected';
-    case 'paid':
-      return 'Paid';
-    case 'overdue':
-      return 'Overdue';
-    case 'cancelled':
-      return 'Cancelled';
-    default:
-      return status;
-  }
-}
+export const STATUS_COLORS: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+  sent: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+  accepted: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+  rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+  paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
+  overdue: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+  cancelled: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500",
+};

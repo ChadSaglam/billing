@@ -12,10 +12,10 @@ CYAN="\033[36m"; GREEN="\033[32m"; YELLOW="\033[33m"; RESET="\033[0m"; BOLD="\03
 echo -e "${BOLD}🧾 chadev-billing — Development Mode${RESET}"
 echo ""
 
-# ── Check port 5432 conflict ──────────────────────────
-if lsof -i :5432 -sTCP:LISTEN > /dev/null 2>&1; then
-  echo -e "${YELLOW}⊘ Port 5432 already in use — DB will use Docker internal network only${RESET}"
-  if grep -q '"5432:5432"' docker-compose.yml 2>/dev/null; then
+# ── Check port 5433 conflict ──────────────────────────
+if lsof -i :5433 -sTCP:LISTEN > /dev/null 2>&1; then
+  echo -e "${YELLOW}⊘ Port 5433 already in use — DB will use Docker internal network only${RESET}"
+  if grep -q '"5434:5433"' docker-compose.yml 2>/dev/null; then
     echo -e "  ${CYAN}Tip: Comment out db ports in docker-compose.yml${RESET}"
   fi
 fi

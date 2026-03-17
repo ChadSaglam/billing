@@ -1,47 +1,27 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
 
-from app.api import clients, dashboard, documents, services, settings
+from app.api import auth, clients, dashboard, documents, services, settings
 from app.database import Base, engine, get_db
-from app.models import Client, CompanySettings, Document, LineItem, ServiceTemplate  # noqa: F401 — ensure models registered
-from app.seed import run_seed
+from sqlalchemy.orm import Session
+from app.auth import get_current_user
+from app.models.user import User
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create all tables
     Base.metadata.create_all(bind=engine)
-
-    # Seed default company settings if none exist
-    from app.database import SessionLocal
-
-    db = SessionLocal()
-    try:
-        existing = db.query(CompanySettings).first()
-        if not existing:
-            db.add(CompanySettings())
-            db.commit()
-
-        # Seed default service templates if none exist
-        from app.models.service_template import ServiceTemplate as ST
-        if db.query(ST).count() == 0:
-            from app.seed import seed_services
-            seed_services(db)
-    finally:
-        db.close()
-
     yield
 
 
 app = FastAPI(
     title="ChaDev Billing API",
     description="Offerte & Rechnungen management for ChaDev",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -53,6 +33,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Auth routes (no JWT required)
+app.include_router(auth.router)
+
+# Protected routes (JWT required via get_tenant_id dependency)
 app.include_router(clients.router)
 app.include_router(documents.router)
 app.include_router(dashboard.router)
@@ -69,6 +53,7 @@ def health():
 
 
 @app.post("/api/seed")
-def seed_data(db: Session = Depends(get_db)):
-    result = run_seed(db)
+def seed_data(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    from app.seed import run_seed
+    result = run_seed(db, user.tenant_id)
     return {"message": "Seed data created", **result}

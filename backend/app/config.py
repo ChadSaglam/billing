@@ -3,6 +3,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://chadev:chadev@db:5432/chadev_billing"
+    SECRET_KEY: str = "change-me-in-production-use-openssl-rand-hex-32"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ALGORITHM: str = "HS256"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

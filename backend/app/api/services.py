@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import get_tenant_id
 from app.database import get_db
 from app.models.service_template import ServiceTemplate
 from app.schemas.service_template import (
@@ -17,8 +18,9 @@ def list_services(
     category: str | None = None,
     active_only: bool = True,
     db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
 ):
-    q = db.query(ServiceTemplate)
+    q = db.query(ServiceTemplate).filter(ServiceTemplate.tenant_id == tenant_id)
     if active_only:
         q = q.filter(ServiceTemplate.is_active.is_(True))
     if category:
@@ -27,8 +29,8 @@ def list_services(
 
 
 @router.post("", response_model=ServiceTemplateRead, status_code=201)
-def create_service(payload: ServiceTemplateCreate, db: Session = Depends(get_db)):
-    svc = ServiceTemplate(**payload.model_dump())
+def create_service(payload: ServiceTemplateCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    svc = ServiceTemplate(**payload.model_dump(), tenant_id=tenant_id)
     db.add(svc)
     db.commit()
     db.refresh(svc)
@@ -40,8 +42,9 @@ def update_service(
     service_id: int,
     payload: ServiceTemplateUpdate,
     db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
 ):
-    svc = db.query(ServiceTemplate).filter(ServiceTemplate.id == service_id).first()
+    svc = db.query(ServiceTemplate).filter(ServiceTemplate.id == service_id, ServiceTemplate.tenant_id == tenant_id).first()
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found")
     for key, value in payload.model_dump(exclude_unset=True).items():
@@ -52,8 +55,8 @@ def update_service(
 
 
 @router.delete("/{service_id}", status_code=204)
-def delete_service(service_id: int, db: Session = Depends(get_db)):
-    svc = db.query(ServiceTemplate).filter(ServiceTemplate.id == service_id).first()
+def delete_service(service_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    svc = db.query(ServiceTemplate).filter(ServiceTemplate.id == service_id, ServiceTemplate.tenant_id == tenant_id).first()
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found")
     db.delete(svc)

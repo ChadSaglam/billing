@@ -21,6 +21,7 @@ class Document(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False, index=True)
     document_type: Mapped[str] = mapped_column(String(20), nullable=False)
     document_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), nullable=False)

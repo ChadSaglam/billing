@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { getClients, createClient } from '@/lib/api';
 import type { CreateClientPayload } from '@/types';
+import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -57,21 +58,18 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
   const [form, setForm] = useState<CreateClientPayload>(emptyClient);
 
   const { data: clients } = useQuery({
-    queryKey: ['clients'],
+    queryKey: queryKeys.clients.all,
     queryFn: () => getClients(),
   });
 
   const createMutation = useMutation({
     mutationFn: createClient,
     onSuccess: (newClient) => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
       onChange(String(newClient.id));
       setDialogOpen(false);
       setForm(emptyClient);
       toast({ title: 'Client created successfully' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to create client', variant: 'destructive' });
     },
   });
 

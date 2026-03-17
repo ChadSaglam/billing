@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.auth import get_tenant_id
 from app.database import get_db
 from app.models.client import Client
 from app.models.document import Document
@@ -13,35 +14,31 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 @router.get("", response_model=DashboardStats)
-def get_dashboard(db: Session = Depends(get_db)):
-    # Total revenue (paid rechnungen)
+def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     total_revenue = (
         db.query(func.coalesce(func.sum(Document.total), 0))
-        .filter(Document.document_type == "rechnung", Document.status == "paid")
+        .filter(Document.tenant_id == tenant_id, Document.document_type == "rechnung", Document.status == "paid")
         .scalar()
     ) or Decimal("0")
 
-    # Outstanding (sent rechnungen)
     outstanding = (
         db.query(func.coalesce(func.sum(Document.total), 0))
-        .filter(Document.document_type == "rechnung", Document.status == "sent")
+        .filter(Document.tenant_id == tenant_id, Document.document_type == "rechnung", Document.status == "sent")
         .scalar()
     ) or Decimal("0")
 
-    # Overdue count
     overdue_count = (
         db.query(func.count(Document.id))
-        .filter(Document.document_type == "rechnung", Document.status == "overdue")
+        .filter(Document.tenant_id == tenant_id, Document.document_type == "rechnung", Document.status == "overdue")
         .scalar()
     ) or 0
 
-    # Client count
-    client_count = db.query(func.count(Client.id)).scalar() or 0
+    client_count = db.query(func.count(Client.id)).filter(Client.tenant_id == tenant_id).scalar() or 0
 
-    # Recent documents
     recent_docs = (
         db.query(Document)
         .options(joinedload(Document.client))
+        .filter(Document.tenant_id == tenant_id)
         .order_by(Document.created_at.desc())
         .limit(10)
         .all()

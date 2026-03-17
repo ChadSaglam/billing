@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import Numeric, String
+from sqlalchemy import Numeric, String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -10,6 +10,7 @@ class CompanySettings(Base):
     __tablename__ = "company_settings"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), unique=True, nullable=False)
     company_name: Mapped[str] = mapped_column(String(255), default="ChaDev")
     street: Mapped[str] = mapped_column(String(255), default="Hohlstrasse 485A")
     postal_code: Mapped[str] = mapped_column(String(10), default="8048")

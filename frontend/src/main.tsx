@@ -1,30 +1,37 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { Toaster } from '@/components/Toaster';
 import App from './App';
+import { Toaster } from '@/components/Toaster';
+import { toast } from '@/hooks/use-toast';
 import './index.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
       retry: 1,
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      onError: (error: unknown) => {
+        const msg =
+          (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+          || 'An unexpected error occurred';
+        toast({ title: msg, variant: 'destructive' });
+      },
     },
   },
 });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <HashRouter>
-        <TooltipProvider>
-          <App />
-          <Toaster />
-        </TooltipProvider>
+        <App />
+        <Toaster />
       </HashRouter>
     </QueryClientProvider>
-  </StrictMode>
+  </React.StrictMode>
 );
