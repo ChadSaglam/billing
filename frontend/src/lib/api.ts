@@ -209,3 +209,8 @@ export async function downloadDocumentPdf(docId: number, docNumber: string, docT
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export async function sendDocumentEmail(docId: number): Promise<{ message: string; recipient: string }> {
+  const res = await api.post(`/api/documents/${docId}/send-email`);
+  return res.data;
+}

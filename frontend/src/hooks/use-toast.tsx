@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export interface Toast {
   id: string;
@@ -11,7 +11,7 @@ let toastListeners: Array<(toast: Toast) => void> = [];
 let toastIdCounter = 0;
 
 export function toast(t: Omit<Toast, 'id'>) {
-  const id = String(++toastIdCounter);
+  const id = `toast-${Date.now()}-${++toastIdCounter}`;
   const newToast: Toast = { ...t, id };
   toastListeners.forEach((listener) => listener(newToast));
   return id;
@@ -27,12 +27,12 @@ export function useToast() {
     }, 4000);
   }, []);
 
-  useState(() => {
+  useEffect(() => {
     toastListeners.push(addToast);
     return () => {
       toastListeners = toastListeners.filter((l) => l !== addToast);
     };
-  });
+  }, [addToast]);
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));

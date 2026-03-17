@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Pencil, Send, CheckCircle, XCircle, DollarSign,
+  Pencil, CheckCircle, XCircle, DollarSign,
   Download, ArrowRightLeft, Trash2, FileText, ExternalLink,
-  Calendar, Clock, CreditCard, Building2,
+  Calendar, Clock, CreditCard, Building2, Mail,
 } from 'lucide-react';
 import {
   getDocument, updateDocumentStatus, convertDocument,
-  deleteDocument, downloadDocumentPdf
+  deleteDocument, downloadDocumentPdf, sendDocumentEmail
 } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
+import { AxiosError } from 'axios';
 import { formatCurrency, formatDate, toNum } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,19 @@ export default function DocumentDetail() {
       navigate('/documents');
     },
     onError: () => toast({ title: 'Failed to delete document', variant: 'destructive' }),
+  });
+
+  const emailMutation = useMutation({
+    mutationFn: () => sendDocumentEmail(Number(id)),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.detail(id!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
+      toast({ title: `Email sent to ${data.recipient}` });
+    },
+    onError: (err: AxiosError<{ detail?: string }>) => {
+      const detail = err?.response?.data?.detail || 'Failed to send email';
+      toast({ title: detail, variant: 'destructive' });
+    },
   });
 
   if (isLoading) {
@@ -178,14 +192,23 @@ export default function DocumentDetail() {
         <CardContent className="py-3">
           <div className="flex flex-wrap items-center gap-2">
             {doc.status === 'draft' && (
-              <>
-                <Button variant="outline" size="sm" onClick={() => navigate(`/documents/${doc.id}/edit`)}>
-                  <Pencil className="mr-2 h-3.5 w-3.5" />Edit
-                </Button>
-                <Button size="sm" onClick={() => statusMutation.mutate('sent')} disabled={statusMutation.isPending}>
-                  <Send className="mr-2 h-3.5 w-3.5" />Mark as Sent
-                </Button>
-              </>
+              <Button variant="outline" size="sm" onClick={() => navigate(`/documents/${doc.id}/edit`)}>
+                <Pencil className="mr-2 h-3.5 w-3.5" />Edit
+              </Button>
+            )}
+
+            {/* Send Email — available for draft and sent */}
+            {['draft', 'sent'].includes(doc.status) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => emailMutation.mutate()}
+                disabled={emailMutation.isPending || !doc.client?.email}
+                title={doc.client?.email ? `Send to ${doc.client.email}` : 'Client has no email'}
+              >
+                <Mail className="mr-2 h-3.5 w-3.5" />
+                {emailMutation.isPending ? 'Sending...' : 'Send Email'}
+              </Button>
             )}
             {doc.status === 'sent' && isOfferte && (
               <>

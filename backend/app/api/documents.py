@@ -223,10 +223,53 @@ def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
     pdf_buffer.seek(0)
 
     type_label = "Rechnung" if doc.document_type == "rechnung" else "Offerte"
-    filename = f"{type_label}_{doc.document_number}.pdf"
+    client_slug = doc.client.company_name.replace(" ", "-").replace("/", "-") if doc.client else "Kunde"
+    filename = f"{type_label}_{doc.document_number}_{client_slug}.pdf"
 
     return StreamingResponse(
         BytesIO(pdf_buffer.read()),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+@router.post("/{doc_id}/send-email")
+def send_document_email_endpoint(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    doc = _load_full(db, doc_id, tenant_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not doc.client or not doc.client.email:
+        raise HTTPException(status_code=400, detail="Client has no email address")
+
+    company = db.query(CompanySettings).filter(
+        CompanySettings.tenant_id == tenant_id
+    ).first()
+    if not company:
+        raise HTTPException(status_code=500, detail="Company settings not configured")
+
+    pdf_buffer = generate_invoice_pdf(doc, company)
+    pdf_buffer.seek(0)
+    pdf_bytes = pdf_buffer.read()
+
+    from app.services.email_sender import send_document_email
+    try:
+        send_document_email(
+            recipient_email=doc.client.email,
+            recipient_name=doc.client.company_name,
+            document_type=doc.document_type,
+            document_number=doc.document_number,
+            pdf_bytes=pdf_bytes,
+            sender_company=company.company_name,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    if doc.status == "draft":
+        doc.status = "sent"
+        db.commit()
+
+    return {"message": "Email sent successfully", "recipient": doc.client.email}

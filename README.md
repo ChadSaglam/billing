@@ -92,8 +92,16 @@ export DATABASE_URL=postgresql://chadev:chadev@localhost:5432/chadev_billing
 # Run the server (auto-creates tables on startup)
 uvicorn app.main:app --reload --port 8000
 
-# Seed sample data
-curl -X POST http://localhost:8000/api/seed
+
+# Step 1: Get token (you already registered)
+TOKEN=$(curl -sf -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"***REMOVED***","password":"***REMOVED***"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+# Step 2: Run seed
+curl -X POST http://localhost:8000/api/seed \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### 3. Frontend

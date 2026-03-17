@@ -317,11 +317,14 @@ print(count)
   fi
 
   echo -e "  ${CYAN}Running CRUD smoke test...${RESET}"
-  CURL_AUTH=()
-  [ -n "${AUTH_HEADER:-}" ] && CURL_AUTH=(-H "$AUTH_HEADER")
+  if [ -n "${AUTH_HEADER:-}" ]; then
+    CURL_AUTH=(-H "$AUTH_HEADER")
+  else
+    CURL_AUTH=()
+  fi
 
   CLIENT_RESP=$(curl -sf -X POST "${BACKEND_URL}/api/clients" \
-    "${CURL_AUTH[@]}" \
+    ${CURL_AUTH+"${CURL_AUTH[@]}"} \
     -H "Content-Type: application/json" \
     -d '{"customer_number":"TEST-999","company_name":"__test_client__","street":"Test St 1","postal_code":"8000","city":"Zürich"}' 2>/dev/null || echo "")
 
