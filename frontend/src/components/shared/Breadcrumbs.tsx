@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import { ChevronRight, Home } from "lucide-react";
 
 interface Crumb {
@@ -8,8 +8,8 @@ interface Crumb {
 
 export default function Breadcrumbs() {
   const params = useParams<{ id?: string }>();
-  const path = window.location.hash.replace("#", "") || "/";
-  const segments = path.split("/").filter(Boolean);
+  const location = useLocation();
+  const segments = location.pathname.split("/").filter(Boolean);
 
   const crumbs: Crumb[] = [{ label: "Home", to: "/" }];
 

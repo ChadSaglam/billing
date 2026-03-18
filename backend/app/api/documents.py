@@ -23,13 +23,11 @@ from app.services.pdf_generator import generate_invoice_pdf
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-
 def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal, Decimal, Decimal]:
     subtotal = sum(item.total_price for item in line_items)
     discount_amount = (subtotal * discount_percent / Decimal("100")).quantize(Decimal("0.01"))
     total = subtotal - discount_amount
     return subtotal, discount_amount, total
-
 
 def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = False, with_client: bool = False) -> Document:
     query = db.query(Document).filter(Document.id == doc_id, Document.tenant_id == tenant_id)
@@ -42,7 +40,6 @@ def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = Fal
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
-
 def _load_full(db: Session, doc_id: int, tenant_id: int) -> Document:
     return (
         db.query(Document)
@@ -51,12 +48,12 @@ def _load_full(db: Session, doc_id: int, tenant_id: int) -> Document:
         .first()
     )
 
-
 @router.get("", response_model=list[DocumentListRead])
 def list_documents(
     document_type: str | None = Query(None),
     status: str | None = Query(None),
     client_id: int | None = Query(None),
+    search: str | None = Query(None),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
@@ -67,8 +64,14 @@ def list_documents(
         query = query.filter(Document.status == status)
     if client_id:
         query = query.filter(Document.client_id == client_id)
+    if search:
+        from app.models.client import Client
+        pattern = f"%{search}%"
+        query = query.filter(
+            (Document.document_number.ilike(pattern)) |
+            (Document.client.has(Client.company_name.ilike(pattern)))
+        )
     return query.order_by(Document.date.desc(), Document.id.desc()).all()
-
 
 @router.get("/{doc_id}", response_model=DocumentRead)
 def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -76,7 +79,6 @@ def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
-
 
 @router.post("", response_model=DocumentRead, status_code=201)
 def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -109,7 +111,6 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_
     db.commit()
     return _load_full(db, doc.id, tenant_id)
 
-
 @router.put("/{doc_id}", response_model=DocumentRead)
 def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
@@ -137,13 +138,11 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     db.commit()
     return _load_full(db, doc.id, tenant_id)
 
-
 @router.delete("/{doc_id}", status_code=204)
 def delete_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
     db.delete(doc)
     db.commit()
-
 
 @router.post("/{doc_id}/convert", response_model=DocumentRead)
 def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -188,7 +187,6 @@ def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db), tena
     db.commit()
     return _load_full(db, rechnung.id, tenant_id)
 
-
 @router.patch("/{doc_id}/status", response_model=DocumentRead)
 def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
@@ -207,7 +205,6 @@ def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depend
     doc.status = data.status
     db.commit()
     return _load_full(db, doc.id, tenant_id)
-
 
 @router.get("/{doc_id}/pdf")
 def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):

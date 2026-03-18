@@ -92,7 +92,11 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between font-normal"
+            className={`w-full justify-between rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all ${
+              selectedClient
+                ? 'border-primary bg-primary/5 text-primary dark:bg-primary/10'
+                : 'border-border hover:border-muted-foreground/30 hover:bg-muted/50'
+            }`}
           >
             {selectedClient
               ? `${selectedClient.company_name} (${selectedClient.customer_number})`

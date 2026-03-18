@@ -29,8 +29,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
-      if (window.location.hash !== '#/login') {
-        window.location.hash = '#/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);
@@ -70,7 +70,9 @@ export const getDocuments = async (params?: {
   client_id?: number;
   search?: string;
 }): Promise<Document[]> => {
-  const { data } = await api.get<Document[]>('/api/documents', { params });
+  const { type, ...rest } = params || {};
+  const queryParams = { ...rest, document_type: type };
+  const { data } = await api.get<Document[]>('/api/documents', { params: queryParams });
   return data;
 };
 
@@ -102,6 +104,26 @@ export const updateDocumentStatus = async (id: number, status: string): Promise<
   const { data } = await api.patch<Document>(`/api/documents/${id}/status`, { status });
   return data;
 };
+
+export async function downloadDocumentPdf(docId: number, docNumber: string, docType: string): Promise<void> {
+  const res = await api.get(`/api/documents/${docId}/pdf`, { responseType: 'blob' });
+  const blob = new Blob([res.data], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+
+  const typeLabel = docType === 'rechnung' ? 'Rechnung' : 'Offerte';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${typeLabel}_${docNumber}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function sendDocumentEmail(docId: number): Promise<{ message: string; recipient: string }> {
+  const res = await api.post(`/api/documents/${docId}/send-email`);
+  return res.data;
+}
 
 // ── Dashboard ────────────────────────────────────────────
 export const getDashboard = async (): Promise<DashboardStats> => {
@@ -182,7 +204,6 @@ export const getMe = async (): Promise<AuthUser> => {
   return data;
 };
 
-
 // ── Logo ─────────────────────────────────────────────────
 export const uploadLogo = async (file: File): Promise<{ logo_url: string }> => {
   const formData = new FormData();
@@ -193,24 +214,6 @@ export const uploadLogo = async (file: File): Promise<{ logo_url: string }> => {
   return data;
 };
 
+
+
 export default api;
-
-export async function downloadDocumentPdf(docId: number, docNumber: string, docType: string): Promise<void> {
-  const res = await api.get(`/api/documents/${docId}/pdf`, { responseType: 'blob' });
-  const blob = new Blob([res.data], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-
-  const typeLabel = docType === 'rechnung' ? 'Rechnung' : 'Offerte';
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${typeLabel}_${docNumber}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-export async function sendDocumentEmail(docId: number): Promise<{ message: string; recipient: string }> {
-  const res = await api.post(`/api/documents/${docId}/send-email`);
-  return res.data;
-}
