@@ -85,10 +85,9 @@ def _build_styles():
         styles.add(style)
     return styles
 
-
-def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.BytesIO:
+def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.BytesIO:
+    """Clean minimal template — no color accent, traditional Swiss business style."""
     buffer = io.BytesIO()
-    page_w, page_h = A4
 
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -96,12 +95,175 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
         topMargin=20 * mm, bottomMargin=25 * mm,
     )
 
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle("DocTitle", fontName="Helvetica-Bold", fontSize=14, leading=18, spaceAfter=2 * mm))
+    styles.add(ParagraphStyle("Meta", fontName="Helvetica", fontSize=9, leading=12, textColor=colors.HexColor("#555555")))
+    styles.add(ParagraphStyle("MetaBold", fontName="Helvetica-Bold", fontSize=9, leading=12))
+    styles.add(ParagraphStyle("Addr", fontName="Helvetica", fontSize=10, leading=14))
+    styles.add(ParagraphStyle("CellR", fontName="Helvetica", fontSize=9, leading=12, alignment=TA_RIGHT))
+    styles.add(ParagraphStyle("CellRB", fontName="Helvetica-Bold", fontSize=9, leading=12, alignment=TA_RIGHT))
+    styles.add(ParagraphStyle("Cell", fontName="Helvetica", fontSize=9, leading=12))
+    styles.add(ParagraphStyle("Foot", fontName="Helvetica", fontSize=7, leading=9, textColor=colors.HexColor("#888888"), alignment=TA_CENTER))
+
+    elements = []
+    type_label = "Rechnung" if document.document_type == "rechnung" else "Offerte"
+    client = document.client
+
+    # Header — company name left-aligned, simple
+    elements.append(Paragraph(f"<b>{settings.company_name}</b>", ParagraphStyle("H", fontName="Helvetica-Bold", fontSize=16, leading=20)))
+    elements.append(Paragraph(
+        f"{settings.street} · {settings.postal_code} {settings.city} · {settings.phone} · {settings.email}",
+        styles["Meta"]
+    ))
+    elements.append(Spacer(1, 1 * mm))
+
+    # Thin line
+    line = Table([[""]], colWidths=[165 * mm], rowHeights=[0.5])
+    line.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#cccccc"))]))
+    elements.append(line)
+    elements.append(Spacer(1, 12 * mm))
+
+    # Client address + meta
+    client_block = (
+        f"<b>{client.company_name}</b><br/>"
+        f"{f'{client.contact_person}<br/>' if client.contact_person else ''}"
+        f"{client.street}<br/>"
+        f"{client.postal_code} {client.city}<br/>"
+        f"{client.country}"
+    )
+    meta_rows = [
+        ("Datum:", _fmt_date(document.date)),
+        ("Fällig:", _fmt_date(document.due_date) if document.due_date else "—"),
+        ("Kunden-Nr.:", client.customer_number),
+        ("UID:", settings.uid),
+    ]
+    meta_html = "".join(f"<b>{l}</b> {v}<br/>" for l, v in meta_rows)
+
+    addr_meta = Table(
+        [[Paragraph(client_block, styles["Addr"]), Paragraph(meta_html, styles["Meta"])]],
+        colWidths=[95 * mm, 70 * mm],
+    )
+    addr_meta.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(addr_meta)
+    elements.append(Spacer(1, 15 * mm))
+
+    # Title
+    elements.append(Paragraph(f"{type_label} Nr. {document.document_number}", styles["DocTitle"]))
+    elements.append(Spacer(1, 2 * mm))
+
+    greeting = (
+        "Sehr geehrte Damen und Herren, vielen Dank für Ihren Auftrag. Für die von Ihnen beauftragten Tätigkeiten berechnen wir Ihnen wie folgt:"
+        if document.document_type == "rechnung"
+        else "Sehr geehrte Damen und Herren, gerne unterbreiten wir Ihnen folgende Offerte:"
+    )
+    elements.append(Paragraph(greeting, styles["Normal"]))
+    elements.append(Spacer(1, 6 * mm))
+
+    # Line items — simple black/white table
+    col_widths = [12 * mm, 72 * mm, 20 * mm, 28 * mm, 30 * mm]
+    hdr_style = ParagraphStyle("TH", fontName="Helvetica-Bold", fontSize=8.5, leading=11)
+    header_row = [
+        Paragraph("Pos.", hdr_style),
+        Paragraph("Bezeichnung", hdr_style),
+        Paragraph("Menge", hdr_style),
+        Paragraph("Einzelpreis", hdr_style),
+        Paragraph("Gesamtpreis", hdr_style),
+    ]
+    table_data = [header_row]
+    for item in document.line_items:
+        table_data.append([
+            Paragraph(str(item.position), styles["Cell"]),
+            Paragraph(item.description, styles["Cell"]),
+            Paragraph(f"{_fmt(item.quantity)} {item.unit}", styles["CellR"]),
+            Paragraph(f"{_fmt(item.unit_price)} CHF", styles["CellR"]),
+            Paragraph(f"{_fmt(item.total_price)} CHF", styles["CellR"]),
+        ])
+
+    items_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    items_table.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("LEADING", (0, 0), (-1, -1), 13),
+        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("LINEBELOW", (0, 0), (-1, 0), 1, colors.black),
+        ("LINEBELOW", (0, -1), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        *[("LINEBELOW", (0, i), (-1, i), 0.25, colors.HexColor("#eeeeee"))
+          for i in range(1, len(table_data) - 1)],
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 3 * mm))
+
+    # Totals
+    totals_data = [["", "", "", Paragraph("Zwischensumme", styles["CellR"]), Paragraph(f"{_fmt(document.subtotal)} CHF", styles["CellR"])]]
+    if document.discount_percent and document.discount_percent > 0:
+        totals_data.append(["", "", "", Paragraph(f"Rabatt ({_fmt(document.discount_percent)}%)", styles["CellR"]), Paragraph(f"–{_fmt(document.discount_amount)} CHF", styles["CellR"])])
+    totals_data.append(["", "", "", Paragraph(f"<b>{type_label}betrag</b>", styles["CellRB"]), Paragraph(f"<b>{_fmt(document.total)} CHF</b>", styles["CellRB"])])
+
+    totals_table = Table(totals_data, colWidths=col_widths)
+    totals_table.setStyle(TableStyle([
+        ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
+        ("LINEABOVE", (-2, -1), (-1, -1), 1, colors.black),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(totals_table)
+    elements.append(Spacer(1, 8 * mm))
+
+    if document.document_type == "rechnung":
+        elements.append(Paragraph(
+            f"Wir bitten Sie um Überweisung des Rechnungsbetrages innerhalb von {document.payment_terms_days} Tagen.",
+            styles["Normal"],
+        ))
+        elements.append(Spacer(1, 4 * mm))
+
+    if document.notes:
+        elements.append(Paragraph(f"<b>Hinweis:</b> {document.notes}", styles["Normal"]))
+        elements.append(Spacer(1, 4 * mm))
+
+    elements.append(Paragraph("Mit freundlichen Grüssen", styles["Normal"]))
+    elements.append(Spacer(1, 2 * mm))
+    elements.append(Paragraph(f"<b>{settings.company_name}</b>", styles["Normal"]))
+    elements.append(Spacer(1, 15 * mm))
+
+    elements.append(line)
+    elements.append(Spacer(1, 2 * mm))
+    elements.append(Paragraph(
+        f"{settings.company_name} · {settings.street} · {settings.postal_code} {settings.city} · UID: {settings.uid}<br/>"
+        f"{settings.bank_name} · IBAN: {settings.iban} · BIC: {settings.bic}<br/>"
+        f"{settings.email} · {settings.phone} · {settings.website}",
+        styles["Foot"],
+    ))
+
+    if document.document_type == "rechnung":
+        elements.append(PageBreak())
+        _add_qr_bill_page(elements, document, settings, _build_styles())
+
+    doc.build(elements)
+    return buffer
+
+def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.BytesIO:
+    buffer = io.BytesIO()
     styles = _build_styles()
     elements = []
     type_label = "Rechnung" if document.document_type == "rechnung" else "Offerte"
     client = document.client
 
-    # ── HEADER: Company name + details ──
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=25 * mm, rightMargin=20 * mm,
+        topMargin=20 * mm, bottomMargin=25 * mm,
+    )
+
+    # ── HEADER ──
     company_detail = (
         f"{settings.street} · {settings.postal_code} {settings.city} · "
         f"{settings.phone} · {settings.email}"
@@ -122,7 +284,6 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
     ]))
     elements.append(header_table)
 
-    # Accent line
     line_table = Table([[""]], colWidths=[165 * mm], rowHeights=[1.5])
     line_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), ACCENT_COLOR),
@@ -133,7 +294,7 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
     elements.append(line_table)
     elements.append(Spacer(1, 12 * mm))
 
-    # ── CLIENT + DOC META side by side ──
+    # ── CLIENT + DOC META ──
     client_block = (
         f"<b>{client.company_name}</b><br/>"
         f"{f'{client.contact_person}<br/>' if client.contact_person else ''}"
@@ -141,7 +302,6 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
         f"{client.postal_code} {client.city}<br/>"
         f"{client.country}"
     )
-
     meta_rows = [
         ("Datum:", _fmt_date(document.date)),
         ("Fällig:", _fmt_date(document.due_date) if document.due_date else "—"),
@@ -153,7 +313,6 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
         f'<font face="Helvetica-Bold" size="9">{val}</font><br/>'
         for label, val in meta_rows
     )
-
     addr_meta = Table(
         [[Paragraph(client_block, styles["Address"]), Paragraph(meta_html, styles["Body"])]],
         colWidths=[95 * mm, 70 * mm],
@@ -170,17 +329,16 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
     elements.append(Paragraph(f"{type_label} Nr. {document.document_number}", styles["DocTitle"]))
     elements.append(Spacer(1, 2 * mm))
 
-    # Greeting
-    if document.document_type == "rechnung":
-        greeting = "Sehr geehrte Damen und Herren, vielen Dank für Ihren Auftrag. Für die von Ihnen beauftragten Tätigkeiten berechnen wir Ihnen wie folgt:"
-    else:
-        greeting = "Sehr geehrte Damen und Herren, gerne unterbreiten wir Ihnen folgende Offerte:"
+    greeting = (
+        "Sehr geehrte Damen und Herren, vielen Dank für Ihren Auftrag. Für die von Ihnen beauftragten Tätigkeiten berechnen wir Ihnen wie folgt:"
+        if document.document_type == "rechnung"
+        else "Sehr geehrte Damen und Herren, gerne unterbreiten wir Ihnen folgende Offerte:"
+    )
     elements.append(Paragraph(greeting, styles["Body"]))
     elements.append(Spacer(1, 6 * mm))
 
-    # ── LINE ITEMS TABLE ──
+    # ── LINE ITEMS ──
     col_widths = [12 * mm, 72 * mm, 20 * mm, 28 * mm, 30 * mm]
-
     header_row = [
         Paragraph("Pos.", styles["TableHeader"]),
         Paragraph("Bezeichnung", styles["TableHeader"]),
@@ -189,7 +347,6 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
         Paragraph("Gesamtpreis", styles["TableHeader"]),
     ]
     table_data = [header_row]
-
     for item in document.line_items:
         table_data.append([
             Paragraph(str(item.position), styles["TableCell"]),
@@ -201,14 +358,11 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
 
     items_table = Table(table_data, colWidths=col_widths, repeatRows=1)
     items_table.setStyle(TableStyle([
-        # Header row
         ("BACKGROUND", (0, 0), (-1, 0), ACCENT_COLOR),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        # Alternating rows
         *[("BACKGROUND", (0, i), (-1, i), LIGHT_BG)
           for i in range(2, len(table_data), 2)],
-        # General
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("LEADING", (0, 0), (-1, -1), 13),
         ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
@@ -218,21 +372,18 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        # Bottom line
         ("LINEBELOW", (0, -1), (-1, -1), 0.75, BORDER_COLOR),
-        # Rounded header effect via top line
         ("LINEABOVE", (0, 0), (-1, 0), 0, ACCENT_COLOR),
     ]))
     elements.append(items_table)
     elements.append(Spacer(1, 3 * mm))
 
     # ── TOTALS ──
-    totals_data = []
-    totals_data.append([
-        "", "", "",
-        Paragraph("Zwischensumme", styles["TableCellRight"]),
-        Paragraph(f"{_fmt(document.subtotal)} CHF", styles["TableCellRight"]),
-    ])
+    totals_data = [
+        ["", "", "",
+         Paragraph("Zwischensumme", styles["TableCellRight"]),
+         Paragraph(f"{_fmt(document.subtotal)} CHF", styles["TableCellRight"])],
+    ]
     if document.discount_percent and document.discount_percent > 0:
         totals_data.append([
             "", "", "",
@@ -257,7 +408,7 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
     elements.append(totals_table)
     elements.append(Spacer(1, 8 * mm))
 
-    # ── PAYMENT NOTE / NOTES ──
+    # ── PAYMENT NOTE ──
     if document.document_type == "rechnung":
         elements.append(Paragraph(
             f"Wir bitten Sie um Überweisung des Rechnungsbetrages innerhalb von "
@@ -267,9 +418,7 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
         elements.append(Spacer(1, 4 * mm))
 
     if document.notes:
-        elements.append(Paragraph(
-            f"<b>Hinweis:</b> {document.notes}", styles["Body"],
-        ))
+        elements.append(Paragraph(f"<b>Hinweis:</b> {document.notes}", styles["Body"]))
         elements.append(Spacer(1, 4 * mm))
 
     # ── CLOSING ──
@@ -278,7 +427,7 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
     elements.append(Paragraph(f"<b>{settings.company_name}</b>", styles["Body"]))
     elements.append(Spacer(1, 15 * mm))
 
-    # ── FOOTER LINE ──
+    # ── FOOTER ──
     elements.append(line_table)
     elements.append(Spacer(1, 2 * mm))
     footer_text = (
@@ -289,7 +438,7 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
     )
     elements.append(Paragraph(footer_text, styles["Footer"]))
 
-    # ── PAGE 2: SWISS QR BILL ──
+    # ── PAGE 2: QR BILL ──
     if document.document_type == "rechnung":
         elements.append(PageBreak())
         _add_qr_bill_page(elements, document, settings, styles)
@@ -297,15 +446,20 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
     doc.build(elements)
     return buffer
 
+def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.BytesIO:
+    template = getattr(settings, 'pdf_template', 'modern') or 'modern'
+    if template == 'classic':
+        return _generate_classic_pdf(document, settings)
+    return _generate_modern_pdf(document, settings)
+
 
 def _add_qr_bill_page(elements, document, settings, styles):
-    """Generate Swiss QR payment slip on a dedicated page."""
+    """Generate Swiss QR payment slip — fixed at bottom of page per SIX spec."""
     import qrcode
-    from reportlab.platypus import KeepTogether
 
     iban_clean = settings.iban.replace(" ", "")
     creditor_name = settings.company_name
-    creditor_address = f"{settings.street}"
+    creditor_address = settings.street
     creditor_zip = settings.postal_code
     creditor_city = settings.city
     debtor_name = document.client.company_name
@@ -316,212 +470,128 @@ def _add_qr_bill_page(elements, document, settings, styles):
     currency = document.currency
     ref_info = f"{document.document_type.upper()} {document.document_number}"
 
-    # Build SPC QR payload (Swiss Payment Code)
+    # SPC QR payload
     qr_data = "\n".join([
-        "SPC",                    # QR Type
-        "0200",                   # Version
-        "1",                      # Coding (UTF-8)
-        iban_clean,               # IBAN
-        "S",                      # Creditor address type (structured)
-        creditor_name,
-        creditor_address,
-        "",                       # Building number (combined in street)
-        creditor_zip,
-        creditor_city,
-        "CH",                     # Creditor country
-        "",                       # Ultimate creditor (empty)
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        amount,
-        currency,
-        "S",                      # Debtor address type
-        debtor_name,
-        debtor_address,
-        "",
-        debtor_zip,
-        debtor_city,
-        "CH",
-        "NON",                    # Reference type
-        "",                       # Reference
-        ref_info,                 # Additional info
-        "EPD",                    # Trailer
+        "SPC", "0200", "1", iban_clean,
+        "S", creditor_name, creditor_address, "", creditor_zip, creditor_city, "CH",
+        "", "", "", "", "", "", "",
+        amount, currency,
+        "S", debtor_name, debtor_address, "", debtor_zip, debtor_city, "CH",
+        "NON", "", ref_info, "EPD",
     ])
 
-    # Generate QR code image
-    qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=3, border=0)
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=3, border=0)
     qr.add_data(qr_data)
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="black", back_color="white")
-
     qr_buffer = io.BytesIO()
     qr_img.save(qr_buffer, format="PNG")
     qr_buffer.seek(0)
     qr_image = Image(qr_buffer, width=46 * mm, height=46 * mm)
 
-    # Swiss cross overlay placeholder (visual only)
-    SLIP_W = 165 * mm
-    RECEIPT_W = 52 * mm
-    PAYMENT_W = SLIP_W - RECEIPT_W - 2 * mm
+    # Styles
+    title_s = ParagraphStyle("QRT", fontName="Helvetica-Bold", fontSize=11, leading=13)
+    label_s = ParagraphStyle("QRL", fontName="Helvetica-Bold", fontSize=6, leading=8)
+    value_s = ParagraphStyle("QRV", fontName="Helvetica", fontSize=8, leading=10)
+    label_big = ParagraphStyle("QRLB", fontName="Helvetica-Bold", fontSize=8, leading=10)
+    value_big = ParagraphStyle("QRVB", fontName="Helvetica", fontSize=10, leading=12)
+    scissor_s = ParagraphStyle("Scissor", fontName="Helvetica", fontSize=7, leading=9,
+                               textColor=colors.HexColor("#999999"), alignment=TA_CENTER)
 
-    section_title = ParagraphStyle("SectionTitle", fontName="Helvetica-Bold", fontSize=11, leading=13, textColor=BRAND_COLOR)
-    slip_label = ParagraphStyle("SlipLabel", fontName="Helvetica-Bold", fontSize=6, leading=8, textColor=colors.black)
-    slip_value = ParagraphStyle("SlipValue", fontName="Helvetica", fontSize=8, leading=10, textColor=colors.black)
-    slip_label_big = ParagraphStyle("SlipLabelBig", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=colors.black)
-    slip_value_big = ParagraphStyle("SlipValueBig", fontName="Helvetica", fontSize=10, leading=12, textColor=colors.black)
-    slip_title = ParagraphStyle("SlipTitle", fontName="Helvetica-Bold", fontSize=11, leading=13, textColor=colors.black)
+    # Push slip to bottom: A4 height = 297mm, slip = 105mm, top margin = 20mm
+    # So we need ~172mm of space before the slip
+    elements.append(Spacer(1, 162 * mm))
 
-    # ── Payment info header ──
-    elements.append(Spacer(1, 10 * mm))
-    elements.append(Paragraph(
-        f"Zahlungsinformationen – Rechnung Nr. {document.document_number}",
-        styles["DocTitle"],
-    ))
-    elements.append(Spacer(1, 5 * mm))
-    elements.append(Paragraph(
-        f"Bitte verwenden Sie den untenstehenden Einzahlungsschein für die Überweisung "
-        f"von <b>CHF {_fmt(document.total)}</b> auf unser Konto.",
-        styles["Body"],
-    ))
-    elements.append(Spacer(1, 15 * mm))
-
-    # ── Separator line (dashed) ──
-    sep_table = Table([[""]], colWidths=[SLIP_W], rowHeights=[0.5])
-    sep_table.setStyle(TableStyle([
-        ("LINEABOVE", (0, 0), (-1, 0), 0.5, colors.black),
+    # Scissor line
+    elements.append(Paragraph("✂  Vor der Einzahlung abzutrennen", scissor_s))
+    dash_line = Table([[""]], colWidths=[165 * mm], rowHeights=[0.5])
+    dash_line.setStyle(TableStyle([
+        ("LINEABOVE", (0, 0), (-1, 0), 0.5, colors.HexColor("#999999")),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
     ]))
-    elements.append(sep_table)
+    elements.append(dash_line)
     elements.append(Spacer(1, 5 * mm))
 
-    # ── Build the payment slip (Empfangsschein + Zahlteil) ──
-    # LEFT: Empfangsschein (receipt)
-    receipt_content = []
-    receipt_content.append(Paragraph("Empfangsschein", slip_title))
-    receipt_content.append(Spacer(1, 3 * mm))
-    receipt_content.append(Paragraph("Konto / Zahlbar an", slip_label))
-    receipt_content.append(Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", slip_value))
-    receipt_content.append(Spacer(1, 2 * mm))
-    receipt_content.append(Paragraph("Zahlbar durch", slip_label))
-    receipt_content.append(Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", slip_value))
-    receipt_content.append(Spacer(1, 3 * mm))
-    receipt_content.append(Paragraph("Währung", slip_label))
-    receipt_content.append(Paragraph(currency, slip_value))
-    receipt_content.append(Paragraph("Betrag", slip_label))
-    receipt_content.append(Paragraph(f"{_fmt(document.total)}", slip_value))
-    receipt_content.append(Spacer(1, 3 * mm))
-    receipt_content.append(Paragraph("<b>Annahmestelle</b>", slip_label))
-
-    receipt_block = []
-    for item in receipt_content:
-        receipt_block.append([item])
-    receipt_table = Table(receipt_block, colWidths=[RECEIPT_W])
+    # ── Empfangsschein (Receipt) — 62mm wide ──
+    RECEIPT_W = 62 * mm
+    receipt_items = [
+        [Paragraph("Empfangsschein", title_s)],
+        [Spacer(1, 2 * mm)],
+        [Paragraph("Konto / Zahlbar an", label_s)],
+        [Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", value_s)],
+        [Spacer(1, 1.5 * mm)],
+        [Paragraph("Zahlbar durch", label_s)],
+        [Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", value_s)],
+        [Spacer(1, 2 * mm)],
+        [Paragraph("Währung          Betrag", label_s)],
+        [Paragraph(f"{currency}                    {_fmt(document.total)}", value_s)],
+        [Spacer(1, 3 * mm)],
+        [Paragraph("<b>Annahmestelle</b>", label_s)],
+    ]
+    receipt_table = Table(receipt_items, colWidths=[RECEIPT_W])
     receipt_table.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5 * mm),
         ("RIGHTPADDING", (0, 0), (-1, -1), 2 * mm),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
 
-    # RIGHT: Zahlteil (payment section with QR)
-    payment_content = []
-    payment_content.append(Paragraph("Zahlteil", slip_title))
-    payment_content.append(Spacer(1, 3 * mm))
-    payment_content.append(qr_image)
-    payment_content.append(Spacer(1, 3 * mm))
-    payment_content.append(Paragraph("Währung", slip_label_big))
-    payment_content.append(Paragraph(currency, slip_value_big))
-    payment_content.append(Paragraph("Betrag", slip_label_big))
-    payment_content.append(Paragraph(f"{_fmt(document.total)}", slip_value_big))
-
-    # Right column of Zahlteil: account info
-    payment_info = []
-    payment_info.append(Paragraph("Konto / Zahlbar an", slip_label_big))
-    payment_info.append(Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", slip_value_big))
-    payment_info.append(Spacer(1, 2 * mm))
-    payment_info.append(Paragraph("Zahlbar durch", slip_label_big))
-    payment_info.append(Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", slip_value_big))
-    payment_info.append(Spacer(1, 2 * mm))
-    payment_info.append(Paragraph("Zusätzliche Informationen", slip_label_big))
-    payment_info.append(Paragraph(ref_info, slip_value_big))
-
-    # QR + amounts on left, account info on right
-    left_col = []
-    for item in payment_content:
-        left_col.append([item])
-    left_table = Table(left_col, colWidths=[56 * mm])
-    left_table.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-
-    right_col = []
-    for item in payment_info:
-        right_col.append([item])
-    right_table = Table(right_col, colWidths=[52 * mm])
-    right_table.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-
-    zahlteil_table = Table([[left_table, right_table]], colWidths=[56 * mm, 52 * mm])
-    zahlteil_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    # ── Zahlteil (Payment) ──
+    # Left: QR + currency/amount
+    pay_left_items = [
+        [Paragraph("Zahlteil", title_s)],
+        [Spacer(1, 2 * mm)],
+        [qr_image],
+        [Spacer(1, 3 * mm)],
+        [Paragraph("Währung          Betrag", label_big)],
+        [Paragraph(f"{currency}                    {_fmt(document.total)}", value_big)],
+    ]
+    pay_left = Table(pay_left_items, colWidths=[56 * mm])
+    pay_left.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 5 * mm),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
 
-    # Combine receipt + payment
+    # Right: account info
+    pay_right_items = [
+        [Spacer(1, 16 * mm)],  # align with QR top
+        [Paragraph("Konto / Zahlbar an", label_big)],
+        [Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", value_big)],
+        [Spacer(1, 1.5 * mm)],
+        [Paragraph("Zahlbar durch", label_big)],
+        [Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", value_big)],
+        [Spacer(1, 1.5 * mm)],
+        [Paragraph("Zusätzliche Informationen", label_big)],
+        [Paragraph(ref_info, value_big)],
+    ]
+    pay_right = Table(pay_right_items, colWidths=[46 * mm])
+    pay_right.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+
+    zahlteil = Table([[pay_left, pay_right]], colWidths=[56 * mm, 46 * mm])
+    zahlteil.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+    ]))
+
+    # Combine receipt | payment
     main_slip = Table(
-        [[receipt_table, zahlteil_table]],
-        colWidths=[RECEIPT_W + 2 * mm, PAYMENT_W],
+        [[receipt_table, zahlteil]],
+        colWidths=[RECEIPT_W, 103 * mm],
     )
     main_slip.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("LINEAFTER", (0, 0), (0, -1), 0.5, colors.black),
+        ("LINEAFTER", (0, 0), (0, -1), 0.5, colors.HexColor("#999999")),
     ]))
 
     elements.append(main_slip)
-
-def _add_fallback_payment_info(elements, document, settings, styles):
-    """Fallback if QR bill generation fails — show payment details as text."""
-    iban_clean = settings.iban.replace(" ", "")
-    elements.append(Spacer(1, 20 * mm))
-    elements.append(Paragraph("Zahlungsinformationen", styles["DocTitle"]))
-    elements.append(Spacer(1, 5 * mm))
-
-    info_data = [
-        ["Konto / Zahlbar an:", f"{iban_clean}"],
-        ["", settings.company_name],
-        ["", f"{settings.street}"],
-        ["", f"{settings.postal_code} {settings.city}"],
-        ["", ""],
-        ["Zahlbar durch:", document.client.company_name],
-        ["", document.client.street],
-        ["", f"{document.client.postal_code} {document.client.city}"],
-        ["", ""],
-        ["Währung:", document.currency],
-        ["Betrag:", f"CHF {_fmt(document.total)}"],
-        ["Referenz:", f"{document.document_type.upper()} {document.document_number}"],
-    ]
-
-    info_table = Table(info_data, colWidths=[45 * mm, 120 * mm])
-    info_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("LEADING", (0, 0), (-1, -1), 14),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-    ]))
-    elements.append(info_table)
+    

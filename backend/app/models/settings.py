@@ -30,3 +30,5 @@ class CompanySettings(Base):
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     next_invoice_number: Mapped[int] = mapped_column(default=1326)
     next_offerte_number: Mapped[int] = mapped_column(default=2001)
+    pdf_template: Mapped[str] = mapped_column(String(50), default="modern")
+

@@ -1,7 +1,5 @@
 from decimal import Decimal
-
 from pydantic import BaseModel
-
 
 class SettingsBase(BaseModel):
     company_name: str
@@ -21,13 +19,12 @@ class SettingsBase(BaseModel):
     logo_url: str | None = None
     next_invoice_number: int
     next_offerte_number: int
-
+    pdf_template: str
 
 class SettingsRead(SettingsBase):
     id: int
-
     model_config = {"from_attributes": True}
-
+    pdf_template: str
 
 class SettingsUpdate(BaseModel):
     company_name: str | None = None
@@ -47,3 +44,4 @@ class SettingsUpdate(BaseModel):
     logo_url: str | None = None
     next_invoice_number: int | None = None
     next_offerte_number: int | None = None
+    pdf_template: str | None = None

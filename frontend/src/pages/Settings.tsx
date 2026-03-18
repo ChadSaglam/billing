@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/shared';
 import { CompanyInfoTab } from '@/components/settings/CompanyInfoTab';
 import { BankDetailsTab } from '@/components/settings/BankDetailsTab';
 import { DefaultsTab } from '@/components/settings/DefaultsTab';
+import { TemplatesTab } from '@/components/settings/TemplatesTab';
 import { ServiceManager } from '@/components/ServiceManager';
 
 export default function Settings() {
@@ -42,13 +43,13 @@ export default function Settings() {
     mutation.mutate(form);
   };
 
-  const updateField = (field: keyof CompanySettings, value: string | number) => {
+  const onFieldChange = (field: keyof CompanySettings, value: string | number) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-4 p-6">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -56,55 +57,64 @@ export default function Settings() {
   }
 
   const saveButton = (
-    <div className="flex justify-end">
-      <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Saving...' : 'Save Settings'}
-      </Button>
-    </div>
+    <Button type="submit" disabled={mutation.isPending} className="mt-4">
+      {mutation.isPending ? 'Saving...' : 'Save Settings'}
+    </Button>
   );
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <PageHeader title="Settings" description="Manage your company details and defaults" />
+    <div className="p-6 max-w-4xl">
+      <PageHeader title="Settings" />
+      <form onSubmit={handleSubmit}>
+        <Tabs defaultValue="company">
+          <TabsList>
+            <TabsTrigger value="company">Company Info</TabsTrigger>
+            <TabsTrigger value="bank">Bank Details</TabsTrigger>
+            <TabsTrigger value="defaults">Defaults</TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+            <TabsTrigger value="services">Services</TabsTrigger>
+          </TabsList>
 
-      <Tabs defaultValue="company" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="company">Company Info</TabsTrigger>
-          <TabsTrigger value="bank">Bank Details</TabsTrigger>
-          <TabsTrigger value="defaults">Defaults</TabsTrigger>
-          <TabsTrigger value="services">Services</TabsTrigger>
-        </TabsList>
-
-        <form onSubmit={handleSubmit}>
-          <TabsContent value="company" className="space-y-6">
-            <CompanyInfoTab form={form} onFieldChange={updateField} />
+          <TabsContent value="company">
+            <CompanyInfoTab form={form} onFieldChange={onFieldChange} />
             {saveButton}
           </TabsContent>
-          <TabsContent value="bank" className="space-y-6">
-            <BankDetailsTab form={form} onFieldChange={updateField} />
-            {saveButton}
-          </TabsContent>
-          <TabsContent value="defaults" className="space-y-6">
-            <DefaultsTab form={form} onFieldChange={updateField} />
-            {saveButton}
-          </TabsContent>
-        </form>
 
-        <TabsContent value="services" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Service Templates</CardTitle>
-              <CardDescription>Manage your reusable service catalog</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" onClick={() => setServiceManagerOpen(true)}>
-                Manage Services
-              </Button>
-            </CardContent>
-          </Card>
-          <ServiceManager open={serviceManagerOpen} onOpenChange={setServiceManagerOpen} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="bank">
+            <BankDetailsTab form={form} onFieldChange={onFieldChange} />
+            {saveButton}
+          </TabsContent>
+
+          <TabsContent value="defaults">
+            <DefaultsTab form={form} onFieldChange={onFieldChange} />
+            {saveButton}
+          </TabsContent>
+
+          <TabsContent value="templates">
+            <TemplatesTab
+              value={(form as any).pdf_template || 'modern'}
+              onChange={(t) => setForm((prev) => ({ ...prev, pdf_template: t }))}
+            />
+            {saveButton}
+          </TabsContent>
+
+          <TabsContent value="services">
+            <Card>
+              <CardHeader>
+                <CardTitle>Service Templates</CardTitle>
+                <CardDescription>Manage your reusable service catalog</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button type="button" onClick={() => setServiceManagerOpen(true)}>
+                  Manage Services
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </form>
+
+      <ServiceManager open={serviceManagerOpen} onOpenChange={setServiceManagerOpen} />
     </div>
   );
 }

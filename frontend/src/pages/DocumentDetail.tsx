@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Pencil, CheckCircle, XCircle, DollarSign,
+  Pencil, CheckCircle, XCircle, DollarSign, Eye,
   Download, ArrowRightLeft, Trash2, FileText, ExternalLink,
   Calendar, Clock, CreditCard, Building2, Mail,
 } from 'lucide-react';
@@ -20,6 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader, StatusBadge, ConfirmDialog, EmptyState } from '@/components/shared';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function DocumentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -233,6 +235,22 @@ export default function DocumentDetail() {
 
             {/* Spacer pushes right-side buttons */}
             <div className="flex-1" />
+
+            {/* Preview - always visible */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const token = localStorage.getItem('auth_token');
+                window.open(
+                  `${API_URL}/api/documents/${doc.id}/preview?token=${token}`,
+                  '_blank'
+                );
+              }}
+            >
+              <Eye className="mr-2 h-3.5 w-3.5" />Vorschau
+            </Button>
+
 
             {/* PDF - always visible */}
             <Button

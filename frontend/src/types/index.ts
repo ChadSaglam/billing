@@ -23,7 +23,6 @@ export interface Client {
   created_at: string;
   updated_at: string;
 }
-
 export interface CreateClientPayload {
   customer_number: string;
   company_name: string;
@@ -40,7 +39,6 @@ export interface CreateClientPayload {
 // ---------------------------------------------------------------------------
 // Line Item
 // ---------------------------------------------------------------------------
-
 export interface LineItem {
   id?: number;
   document_id?: number;
@@ -56,7 +54,6 @@ export interface LineItem {
 // ---------------------------------------------------------------------------
 // Document
 // ---------------------------------------------------------------------------
-
 export type DocumentStatus =
   | 'draft'
   | 'sent'
@@ -142,6 +139,7 @@ export interface CompanySettings {
   logo_url: string | null;
   next_invoice_number: number;
   next_offerte_number: number;
+  pdf_template: string;
 }
 
 // ---------------------------------------------------------------------------

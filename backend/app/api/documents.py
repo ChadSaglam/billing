@@ -232,6 +232,40 @@ def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
+@router.get("/{doc_id}/preview")
+def preview_pdf(doc_id: int, template: str = Query("modern"), token: str = Query(None), db: Session = Depends(get_db)):
+    from jose import JWTError, jwt as jose_jwt
+    from app.config import settings as app_settings
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        payload = jose_jwt.decode(token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
+        tenant_id = payload["tid"]
+    except (JWTError, KeyError):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    doc = _load_full(db, doc_id, tenant_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
+    if not settings:
+        raise HTTPException(status_code=500, detail="Company settings not configured")
+
+    original = settings.pdf_template
+    settings.pdf_template = template
+    pdf_buffer = generate_invoice_pdf(doc, settings)
+    settings.pdf_template = original
+
+    pdf_buffer.seek(0)
+    return StreamingResponse(
+        BytesIO(pdf_buffer.read()),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"},
+    )
+
 @router.post("/{doc_id}/send-email")
 def send_document_email_endpoint(
     doc_id: int,

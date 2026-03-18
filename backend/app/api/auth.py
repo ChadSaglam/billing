@@ -93,3 +93,4 @@ def get_me(user: User = Depends(get_current_user)):
         tenant_id=user.tenant_id,
         tenant_name=user.tenant.name,
     )
+
