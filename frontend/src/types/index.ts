@@ -47,6 +47,7 @@ export interface LineItem {
   quantity: Numeric;
   unit_price: Numeric;
   total_price: Numeric;
+  vat_rate: Numeric;
   unit: string;
   created_at?: string;
 }
@@ -76,6 +77,7 @@ export interface Document {
   subtotal: Numeric;
   discount_percent: Numeric;
   discount_amount: Numeric;
+  vat_amount: Numeric;
   total: Numeric;
   currency: string;
   notes: string | null;
@@ -101,8 +103,10 @@ export interface CreateDocumentPayload {
     unit: string;
     unit_price: number;
     total_price: number;
+    vat_rate: number;
   }[];
 }
+
 
 // ---------------------------------------------------------------------------
 // Dashboard

@@ -23,11 +23,25 @@ from app.services.pdf_generator import generate_invoice_pdf
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    """Returns (subtotal, discount_amount, vat_amount, total)."""
     subtotal = sum(item.total_price for item in line_items)
     discount_amount = (subtotal * discount_percent / Decimal("100")).quantize(Decimal("0.01"))
-    total = subtotal - discount_amount
-    return subtotal, discount_amount, total
+    after_discount = subtotal - discount_amount
+
+    # Calculate VAT per line item proportionally after discount
+    if subtotal > 0:
+        discount_ratio = after_discount / subtotal
+        vat_amount = sum(
+            (item.total_price * discount_ratio * item.vat_rate / Decimal("100")).quantize(Decimal("0.01"))
+            for item in line_items
+        )
+    else:
+        vat_amount = Decimal("0")
+
+    total = after_discount + vat_amount
+    return subtotal, discount_amount, vat_amount, total
+
 
 def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = False, with_client: bool = False) -> Document:
     query = db.query(Document).filter(Document.id == doc_id, Document.tenant_id == tenant_id)
@@ -103,9 +117,10 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_
     db.flush()
 
     items = db.query(LineItem).filter(LineItem.document_id == doc.id).all()
-    subtotal, discount_amount, total = _recalc_totals(items, data.discount_percent)
+    subtotal, discount_amount, vat_amount, total = _recalc_totals(items, doc.discount_percent)
     doc.subtotal = subtotal
     doc.discount_amount = discount_amount
+    doc.vat_amount = vat_amount
     doc.total = total
 
     db.commit()

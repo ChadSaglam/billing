@@ -12,6 +12,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 from app.models.document import Document
 from app.models.settings import CompanySettings
+from app.services.qr_reference import generate_creditor_reference
 
 BRAND_COLOR = colors.HexColor("#1a1a2e")
 ACCENT_COLOR = colors.HexColor("#0f3460")
@@ -468,6 +469,7 @@ def _add_qr_bill_page(elements, document, settings, styles):
     debtor_city = document.client.city
     amount = f"{document.total:.2f}"
     currency = document.currency
+    creditor_ref = generate_creditor_reference(document.document_number)
     ref_info = f"{document.document_type.upper()} {document.document_number}"
 
     # SPC QR payload
@@ -477,7 +479,7 @@ def _add_qr_bill_page(elements, document, settings, styles):
         "", "", "", "", "", "", "",
         amount, currency,
         "S", debtor_name, debtor_address, "", debtor_zip, debtor_city, "CH",
-        "NON", "", ref_info, "EPD",
+        "SCOR", "", creditor_ref, ref_info, "EPD",
     ])
 
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=3, border=0)

@@ -56,6 +56,7 @@ export default function DocumentForm() {
         unit: li.unit,
         unit_price: toNum(li.unit_price),
         total_price: toNum(li.total_price),
+        vat_rate: toNum(li.vat_rate),
       }))
     );
   }, [existingDoc]);
@@ -101,8 +102,10 @@ export default function DocumentForm() {
         unit: li.unit,
         unit_price: Number(li.unit_price),
         total_price: Number(li.quantity) * Number(li.unit_price),
+        vat_rate: li.vat_rate,
       })),
     };
+
 
     if (isEdit) { updateMutation.mutate(payload); } else { createMutation.mutate(payload); }
   };

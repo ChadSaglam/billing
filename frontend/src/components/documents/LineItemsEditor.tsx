@@ -42,7 +42,23 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
 
   const subtotal = items.reduce((sum, item) => sum + item.total_price, 0);
   const discountAmount = (subtotal * discountPercent) / 100;
-  const total = subtotal - discountAmount;
+  const afterDiscount = subtotal - discountAmount;
+
+  // Calculate VAT grouped by rate
+  const vatByRate = useMemo(() => {
+    const map = new Map<number, number>();
+    const ratio = subtotal > 0 ? afterDiscount / subtotal : 0;
+    for (const item of items) {
+      const vatAmount = item.total_price * ratio * item.vat_rate / 100;
+      map.set(item.vat_rate, (map.get(item.vat_rate) || 0) + vatAmount);
+    }
+    return Array.from(map.entries())
+      .filter(([, amt]) => amt > 0)
+      .sort(([a], [b]) => b - a);
+  }, [items, afterDiscount, subtotal]);
+
+  const totalVat = vatByRate.reduce((sum, [, amt]) => sum + amt, 0);
+  const total = afterDiscount + totalVat;
 
   const handleItemChange = (index: number, field: keyof LineItemFormData, value: string | number) => {
     const updated = [...items];
@@ -67,6 +83,7 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
       unit: svc.unit,
       unit_price: price,
       total_price: price,
+      vat_rate: 8.1,
     }]);
   };
 
@@ -78,91 +95,89 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
   return (
     <>
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Line Items</CardTitle>
-            <div className="flex items-center gap-2">
-              <Select value="" onValueChange={(v) => v && addServiceAsLine(v)}>
-                <SelectTrigger className="h-8 w-[180px] text-xs">
-                  <SelectValue placeholder="+ Add from service..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(servicesByCategory).map(([category, svcs]) => (
-                    <SelectGroup key={category}>
-                      <SelectLabel>{category}</SelectLabel>
-                      {svcs.map((svc) => (
-                        <SelectItem key={svc.id} value={String(svc.id)}>
-                          <div className="flex items-center justify-between w-full gap-4">
-                            <span>{svc.name}</span>
-                            <span className="text-xs text-muted-foreground font-mono">
-                              {formatCurrency(svc.default_price)}/{svc.unit}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={addLine}>
-                <Plus className="mr-1 h-3 w-3" />Line
-              </Button>
-
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setServiceManagerOpen(true)}>
-                <Settings2 className="mr-1 h-3 w-3" />Services
-              </Button>
-            </div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="text-base">Line Items</CardTitle>
+          <div className="flex items-center gap-2">
+            <Select onValueChange={(v) => v && addServiceAsLine(v)}>
+              <SelectTrigger className="w-[200px] h-8 text-xs">
+                <SelectValue placeholder="Add from catalog..." />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(servicesByCategory).map(([category, svcs]) => (
+                  <SelectGroup key={category}>
+                    <SelectLabel>{category}</SelectLabel>
+                    {svcs.map((svc) => (
+                      <SelectItem key={svc.id} value={String(svc.id)}>
+                        <span>{svc.name}</span>
+                        <span className="ml-2 text-muted-foreground">
+                          {formatCurrency(svc.default_price)}/{svc.unit}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={addLine}>
+              <Plus className="mr-1 h-3 w-3" />Line
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setServiceManagerOpen(true)}>
+              <Settings2 className="mr-1 h-3 w-3" />Services
+            </Button>
           </div>
         </CardHeader>
-
-        <CardContent className="pt-0">
+        <CardContent className="space-y-2">
           {/* Table header */}
-          <div className="rounded-lg border overflow-hidden">
-            <div className="grid grid-cols-[40px_1fr_70px_100px_100px_90px_40px] gap-0 bg-muted/50 border-b px-3 py-2">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase">#</span>
-              <span className="text-[11px] font-medium text-muted-foreground uppercase">Description</span>
-              <span className="text-[11px] font-medium text-muted-foreground uppercase text-center">Qty</span>
-              <span className="text-[11px] font-medium text-muted-foreground uppercase text-center">Unit</span>
-              <span className="text-[11px] font-medium text-muted-foreground uppercase text-right">Price</span>
-              <span className="text-[11px] font-medium text-muted-foreground uppercase text-right">Total</span>
-              <span />
-            </div>
-
-            {/* Rows */}
-            {items.map((item, index) => (
-              <LineItemRow
-                key={index}
-                item={item}
-                index={index}
-                canRemove={items.length > 1}
-                onChange={handleItemChange}
-                onRemove={removeLine}
-              />
-            ))}
+          <div className="grid grid-cols-[1fr_70px_100px_110px_80px_100px_40px] gap-2 text-xs font-medium text-muted-foreground px-1">
+            <span>Description</span>
+            <span>Qty</span>
+            <span>Unit</span>
+            <span>Price</span>
+            <span>MwSt</span>
+            <span className="text-right">Total</span>
+            <span />
           </div>
 
+          {/* Rows */}
+          {items.map((item, index) => (
+            <LineItemRow
+              key={index}
+              item={item}
+              index={index}
+              canRemove={items.length > 1}
+              onChange={handleItemChange}
+              onRemove={removeLine}
+            />
+          ))}
+
+          <Separator className="my-3" />
+
           {/* Totals */}
-          <div className="mt-4 ml-auto w-72 space-y-2">
-            <div className="flex justify-between text-sm">
+          <div className="space-y-1.5 text-sm max-w-xs ml-auto">
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="font-mono">{formatCurrency(subtotal)}</span>
             </div>
             {discountPercent > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Discount ({discountPercent}%)</span>
-                <span className="font-mono text-destructive">−{formatCurrency(discountAmount)}</span>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Discount ({discountPercent}%)</span>
+                <span className="font-mono">−{formatCurrency(discountAmount)}</span>
               </div>
             )}
+            {vatByRate.map(([rate, amt]) => (
+              <div key={rate} className="flex justify-between text-muted-foreground">
+                <span>MwSt {rate}%</span>
+                <span className="font-mono">{formatCurrency(amt)}</span>
+              </div>
+            ))}
             <Separator />
-            <div className="flex justify-between text-base font-semibold pt-1">
+            <div className="flex justify-between font-semibold">
               <span>Total</span>
               <span className="font-mono">{formatCurrency(total)}</span>
             </div>
           </div>
         </CardContent>
       </Card>
-
       <ServiceManager open={serviceManagerOpen} onOpenChange={setServiceManagerOpen} />
     </>
   );

@@ -32,12 +32,14 @@ class Document(Base):
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
     discount_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"))
     discount_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
+    vat_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
     currency: Mapped[str] = mapped_column(String(3), default="CHF")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     converted_from_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id"), nullable=True
     )
+
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow

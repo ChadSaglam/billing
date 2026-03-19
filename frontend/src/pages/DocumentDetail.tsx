@@ -222,7 +222,7 @@ export default function DocumentDetail() {
                 </Button>
               </>
             )}
-            {doc.status === 'sent' && !isOfferte && (
+            {doc.status === 'overdue' && !isOfferte && (
               <Button size="sm" onClick={() => statusMutation.mutate('paid')} disabled={statusMutation.isPending} className="bg-green-600 hover:bg-green-700">
                 <DollarSign className="mr-2 h-3.5 w-3.5" />Mark Paid
               </Button>
@@ -286,6 +286,7 @@ export default function DocumentDetail() {
                   <th className="text-right font-medium text-muted-foreground px-4 py-2.5 w-[60px]">Qty</th>
                   <th className="text-left font-medium text-muted-foreground px-4 py-2.5 w-[80px]">Unit</th>
                   <th className="text-right font-medium text-muted-foreground px-4 py-2.5 w-[110px]">Price</th>
+                  <th className="text-right font-medium text-muted-foreground px-4 py-2.5 w-[110px]">MwSt</th>
                   <th className="text-right font-medium text-muted-foreground px-4 py-2.5 w-[110px]">Total</th>
                 </tr>
               </thead>
@@ -297,6 +298,7 @@ export default function DocumentDetail() {
                     <td className="px-4 py-3 text-right font-mono">{item.quantity}</td>
                     <td className="px-4 py-3 text-muted-foreground">{item.unit}</td>
                     <td className="px-4 py-3 text-right font-mono">{formatCurrency(item.unit_price)}</td>
+                    <td className="px-4 py-3 text-right font-mono">{toNum(item.vat_rate)}%</td>
                     <td className="px-4 py-3 text-right font-mono font-medium">{formatCurrency(item.total_price)}</td>
                   </tr>
                 ))}
@@ -316,6 +318,28 @@ export default function DocumentDetail() {
                 <span className="font-mono text-destructive">−{formatCurrency(doc.discount_amount)}</span>
               </div>
             )}
+            <Separator />
+            {(() => {
+              const sub = toNum(doc.subtotal);
+              const disc = toNum(doc.discount_amount);
+              const afterDisc = sub - disc;
+              const ratio = sub > 0 ? afterDisc / sub : 0;
+              const vatMap = new Map<number, number>();
+              doc.line_items.forEach((li) => {
+                const rate = toNum(li.vat_rate);
+                const amt = toNum(li.total_price) * ratio * rate / 100;
+                vatMap.set(rate, (vatMap.get(rate) || 0) + amt);
+              });
+              return Array.from(vatMap.entries())
+                .filter(([, amt]) => amt > 0)
+                .sort(([a], [b]) => b - a)
+                .map(([rate, amt]) => (
+                  <div key={rate} className="flex justify-between text-muted-foreground">
+                    <span>MwSt {rate}%</span>
+                    <span className="font-mono">{formatCurrency(amt)}</span>
+                  </div>
+                ));
+            })()}
             <Separator />
             <div className="flex justify-between text-base font-semibold pt-1">
               <span>Total</span>

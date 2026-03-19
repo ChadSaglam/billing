@@ -14,6 +14,7 @@ class LineItemBase(BaseModel):
     quantity: Decimal = Decimal("1")
     unit_price: Decimal
     total_price: Decimal
+    vat_rate: Decimal = Decimal("8.10")
     unit: str = "Stunde"
 
 
@@ -39,6 +40,7 @@ class DocumentBase(BaseModel):
     subtotal: Decimal = Decimal("0")
     discount_percent: Decimal = Decimal("0")
     discount_amount: Decimal = Decimal("0")
+    vat_amount: Decimal = Decimal("0")
     total: Decimal = Decimal("0")
     currency: str = "CHF"
     notes: Optional[str] = None
@@ -59,6 +61,7 @@ class DocumentUpdate(BaseModel):
     subtotal: Optional[Decimal] = None
     discount_percent: Optional[Decimal] = None
     discount_amount: Optional[Decimal] = None
+    vat_amount: Optional[Decimal] = None
     total: Optional[Decimal] = None
     currency: Optional[str] = None
     notes: Optional[str] = None
@@ -90,6 +93,7 @@ class DocumentListRead(BaseModel):
     due_date: Optional[DateType] = None
     status: str
     total: Decimal
+    vat_amount: Decimal = Decimal("0")
     currency: str
     created_at: datetime
     client: Optional[ClientRead] = None

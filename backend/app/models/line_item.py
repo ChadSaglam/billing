@@ -19,6 +19,7 @@ class LineItem(Base):
     quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("1"))
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    vat_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("8.10"))
     unit: Mapped[str] = mapped_column(String(50), default="Stunde")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
 
