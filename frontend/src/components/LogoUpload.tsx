@@ -48,7 +48,7 @@ export function LogoUpload({ value, onChange }: LogoUploadProps) {
 
   const logoSrc = value
     ? value.startsWith('/')
-      ? `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${value}`
+      ? `${import.meta.env.VITE_API_URL || 'http://localhost:8001'}${value}`
       : value
     : null;
 

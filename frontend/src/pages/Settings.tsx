@@ -92,8 +92,8 @@ export default function Settings() {
 
           <TabsContent value="templates">
             <TemplatesTab
-              value={(form as any).pdf_template || 'modern'}
-              onChange={(t) => setForm((prev) => ({ ...prev, pdf_template: t }))}
+              value={form.pdf_template || 'modern'}
+              onChange={(t: string) => setForm((prev) => ({ ...prev, pdf_template: t }))}
             />
             {saveButton}
           </TabsContent>

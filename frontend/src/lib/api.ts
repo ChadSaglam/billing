@@ -11,7 +11,7 @@ import type {
 } from '@/types';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
 });
 
 // Request interceptor — attach JWT when available

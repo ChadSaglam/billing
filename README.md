@@ -36,7 +36,7 @@ cd chadev-billing
 docker-compose up --build
 
 # Seed the database with sample clients, invoices, and service templates
-curl -X POST http://localhost:8000/api/seed
+curl -X POST http://localhost:8001/api/seed
 ```
 
 Open your browser:
@@ -44,15 +44,15 @@ Open your browser:
 | Service       | URL                           |
 |---------------|-------------------------------|
 | Frontend      | http://localhost:5173          |
-| Backend API   | http://localhost:8000          |
-| API Docs      | http://localhost:8000/docs     |
+| Backend API   | http://localhost:8001          |
+| API Docs      | http://localhost:8001/docs     |
 
 ### Rebuild after code changes
 
 ```bash
 docker-compose down -v          # -v removes volumes (resets database)
 docker-compose up --build
-curl -X POST http://localhost:8000/api/seed
+curl -X POST http://localhost:8001/api/seed
 ```
 
 > **Note:** Services (16 templates) are auto-seeded on startup. The `/api/seed` endpoint creates sample clients and invoices.
@@ -87,20 +87,20 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Set the database URL
-export DATABASE_URL=postgresql://chadev:chadev@localhost:5432/chadev_billing
+export DATABASE_URL=postgresql://chadev:chadev@db:5432/chadev_billing
 
 # Run the server (auto-creates tables on startup)
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 
 
 # Step 1: Get token (you already registered)
-TOKEN=$(curl -sf -X POST http://localhost:8000/api/auth/login \
+TOKEN=$(curl -sf -X POST http://localhost:8001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"***REMOVED***","password":"***REMOVED***"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # Step 2: Run seed
-curl -X POST http://localhost:8000/api/seed \
+curl -X POST http://localhost:8001/api/seed \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -112,7 +112,7 @@ npm install
 npm run dev
 ```
 
-Frontend runs at http://localhost:5173, backend at http://localhost:8000.
+Frontend runs at http://localhost:5173, backend at http://localhost:8001.
 
 ---
 

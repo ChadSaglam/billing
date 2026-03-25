@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 const templates = [
   {
@@ -25,7 +25,7 @@ interface Props {
 }
 
 export function TemplatesTab({ value, onChange }: Props) {
-  const [previewTemplate, setPreviewTemplate] = useState<string | null>(null);
+  const [, setPreviewTemplate] = useState<string | null>(null);
 
   const handlePreview = (templateId: string) => {
     const token = localStorage.getItem('auth_token');

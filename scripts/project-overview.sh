@@ -7,7 +7,7 @@ set -uo pipefail
 
 CYAN="\033[36m"; GREEN="\033[32m"; YELLOW="\033[33m"; RED="\033[31m"; RESET="\033[0m"; BOLD="\033[1m"; DIM="\033[2m"
 COMPOSE="docker compose"
-BACKEND_URL="http://localhost:8000"
+BACKEND_URL="http://localhost:8001"
 FRONTEND_URL="http://localhost:5173"
 DB_USER="chadev"
 DB_NAME="chadev_billing"
@@ -48,10 +48,10 @@ echo ""
 
 # ── Architecture ────────────────────────────────────────
 echo -e "${BOLD}Architecture${RESET}"
-echo "  ┌─────────────┐     ┌──────────────┐     ┌────────────┐"
+echo "  ┌──────────────┐     ┌───────────────┐     ┌────────────┐"
 echo "  │  React/Vite  │────▶│   FastAPI     │────▶│ PostgreSQL │"
-echo "  │    :5173     │     │    :8000      │     │   :5432    │"
-echo "  └─────────────┘     └──────────────┘     └────────────┘"
+echo "  │    :5173     │     │    :8001      │     │   :5432    │"
+echo "  └──────────────┘     └───────────────┘     └────────────┘"
 echo "   Tailwind/shadcn     SQLAlchemy/Alembic    chadev_billing"
 echo ""
 
@@ -144,7 +144,7 @@ echo ""
 echo -e "${BOLD}Service Status${RESET}"
 
 if curl -sf "${BACKEND_URL}/docs" > /dev/null 2>&1; then
-  echo -e "  API:        ${GREEN}● Running${RESET} (port 8000)"
+  echo -e "  API:        ${GREEN}● Running${RESET} (port 8001)"
   echo -e "  ${DIM}Docs: ${BACKEND_URL}/docs${RESET}"
 
   echo -e "  ${DIM}Endpoints:${RESET}"

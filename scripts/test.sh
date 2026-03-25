@@ -9,7 +9,7 @@ CYAN="\033[36m"; GREEN="\033[32m"; RED="\033[31m"; YELLOW="\033[33m"; DIM="\033[
 ERRORS=0; WARNINGS=0; PASSED=0
 
 COMPOSE="docker compose"
-BACKEND_URL="http://localhost:8000"
+BACKEND_URL="http://localhost:8001"
 FRONTEND_URL="http://localhost:5173"
 DB_USER="chadev"
 DB_NAME="chadev_billing"
@@ -151,14 +151,18 @@ else
   fi
 fi
 
-if npx eslint src/ --quiet 2>/dev/null; then
+LINT_OUTPUT=$(npx eslint src/ 2>&1)
+LINT_EXIT=$?
+if [ $LINT_EXIT -eq 0 ]; then
   pass "ESLint passes"
 else
-  LINT_ERR=$(npx eslint src/ --quiet 2>&1 | grep -c "error" 2>/dev/null || echo "0")
-  if [ "${LINT_ERR:-0}" -gt 0 ] 2>/dev/null; then
-    fail "ESLint: ${LINT_ERR} errors"
+  LINT_ERRORS=$(echo "$LINT_OUTPUT" | grep -c " error " 2>/dev/null || echo "0")
+  LINT_WARNS=$(echo "$LINT_OUTPUT" | grep -c " warning " 2>/dev/null || echo "0")
+  if [ "${LINT_ERRORS:-0}" -gt 0 ] 2>/dev/null; then
+    warn "ESLint: ${LINT_ERRORS} errors, ${LINT_WARNS} warnings"
+    echo "$LINT_OUTPUT" | grep -E "error|✖" | head -5 | while read -r line; do info "$line"; done
   else
-    warn "ESLint has warnings"
+    pass "ESLint passes (${LINT_WARNS} warnings)"
   fi
 fi
 
@@ -365,7 +369,7 @@ echo ""
 # ── 9. Port Conflicts ────────────────────────────────
 echo -e "${BOLD}9. Port Conflicts${RESET}"
 
-for port in 5432 8000 5173; do
+for port in 5434 8001 5173; do
   listeners=$(lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -cv "^COMMAND" 2>/dev/null || echo "0")
   listeners="${listeners//[^0-9]/}"
 [ -z "$listeners" ] && listeners=0

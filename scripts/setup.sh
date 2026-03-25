@@ -69,12 +69,12 @@ echo -e "  ${GREEN}✓${RESET} Docker images built"
 # ── Port Check ─────────────────────────────────────────
 echo ""
 echo -e "${BOLD}Checking ports...${RESET}"
-for port in 5432 8000 5173; do
+for port in 5434 8001 5173; do
   if lsof -i :"$port" -sTCP:LISTEN > /dev/null 2>&1; then
     PROC=$(lsof -i :"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
     PNAME=$(ps -p "$PROC" -o comm= 2>/dev/null || echo "unknown")
     echo -e "  ${YELLOW}⊘${RESET} Port ${port} in use by ${PNAME} (PID ${PROC})"
-    if [ "$port" = "5432" ]; then
+    if [ "$port" = "5434" ]; then
       echo -e "    ${CYAN}Tip: Remove 'ports' from db service in docker-compose.yml if not needed${RESET}"
     fi
   else
@@ -86,9 +86,8 @@ echo ""
 echo -e "${GREEN}${BOLD}✓ Setup complete!${RESET}"
 echo ""
 echo "Start services:"
-echo "  docker compose up -d      # all services"
 echo "  ./scripts/dev.sh          # development mode"
 echo ""
-echo "Verify:"
+echo "Verify & In another terminal:"
 echo "  ./scripts/test.sh              # run all checks"
 echo "  ./scripts/project-overview.sh"

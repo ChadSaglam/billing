@@ -21,7 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader, StatusBadge, ConfirmDialog, EmptyState } from '@/components/shared';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export default function DocumentDetail() {
   const { id } = useParams<{ id: string }>();

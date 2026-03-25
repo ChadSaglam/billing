@@ -348,7 +348,7 @@ Based on actual ChaDev invoices:
 DATABASE_URL=postgresql://chadev:chadev@db:5432/chadev_billing
 
 # Frontend
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:8001
 ```
 
 ## License
