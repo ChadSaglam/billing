@@ -13,6 +13,7 @@ import { CompanyInfoTab } from '@/components/settings/CompanyInfoTab';
 import { BankDetailsTab } from '@/components/settings/BankDetailsTab';
 import { DefaultsTab } from '@/components/settings/DefaultsTab';
 import { TemplatesTab } from '@/components/settings/TemplatesTab';
+import { TeamTab } from '@/components/settings/TeamTab';
 import { ServiceManager } from '@/components/ServiceManager';
 
 export default function Settings() {
@@ -73,6 +74,7 @@ export default function Settings() {
             <TabsTrigger value="defaults">Defaults</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="services">Services</TabsTrigger>
+            <TabsTrigger value="team">Team</TabsTrigger>
           </TabsList>
 
           <TabsContent value="company">
@@ -110,6 +112,10 @@ export default function Settings() {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="team">
+            <TeamTab />
           </TabsContent>
         </Tabs>
       </form>

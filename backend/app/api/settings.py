@@ -13,18 +13,15 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 UPLOAD_DIR = "/app/uploads/logos"
 
-
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
     settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
     if not settings:
         raise HTTPException(status_code=404, detail="Settings not found")
     return settings
 
-
 @router.get("", response_model=SettingsRead)
 def get_settings(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     return _get_settings(db, tenant_id)
-
 
 @router.put("", response_model=SettingsRead)
 def update_settings(data: SettingsUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -34,7 +31,6 @@ def update_settings(data: SettingsUpdate, db: Session = Depends(get_db), tenant_
     db.commit()
     db.refresh(settings)
     return settings
-
 
 @router.post("/logo")
 def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -55,3 +51,12 @@ def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db), ten
     db.refresh(settings)
 
     return {"logo_url": logo_url}
+
+@router.post("/onboarding-complete")
+def complete_onboarding(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
+    if not settings:
+        raise HTTPException(status_code=404, detail="Settings not found")
+    settings.onboarding_completed = True
+    db.commit()
+    return {"status": "ok"}

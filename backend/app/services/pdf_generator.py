@@ -455,39 +455,104 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
 
 
 def _add_qr_bill_page(elements, document, settings, styles):
-    """Generate Swiss QR payment slip — fixed at bottom of page per SIX spec."""
+    """Swiss QR payment slip per SIX Group spec v2.3."""
     import qrcode
+    from qrcode.image.pil import PilImage
+    from PIL import Image as PILImage
+    from app.services.qr_reference import generate_creditor_reference, format_creditor_reference, validate_qr_iban
 
-    iban_clean = settings.iban.replace(" ", "")
-    creditor_name = settings.company_name
-    creditor_address = settings.street
-    creditor_zip = settings.postal_code
-    creditor_city = settings.city
-    debtor_name = document.client.company_name
-    debtor_address = document.client.street
-    debtor_zip = document.client.postal_code
-    debtor_city = document.client.city
+    iban_clean = settings.iban.replace(" ", "").upper()
+    creditor_name = settings.company_name[:70]
+    creditor_address = settings.street[:70]
+    creditor_zip = settings.postal_code[:16]
+    creditor_city = settings.city[:35]
+    debtor_name = document.client.company_name[:70]
+    debtor_address = document.client.street[:70]
+    debtor_zip = document.client.postal_code[:16]
+    debtor_city = document.client.city[:35]
+    debtor_country = (document.client.country or "CH")[:2].upper()
     amount = f"{document.total:.2f}"
-    currency = document.currency
+    currency = document.currency or "CHF"
     creditor_ref = generate_creditor_reference(document.document_number)
+    creditor_ref_display = format_creditor_reference(creditor_ref)
     ref_info = f"{document.document_type.upper()} {document.document_number}"
 
-    # SPC QR payload
-    qr_data = "\n".join([
-        "SPC", "0200", "1", iban_clean,
-        "S", creditor_name, creditor_address, "", creditor_zip, creditor_city, "CH",
+    # SPC QR payload — SIX Group v2.3 spec
+    # Fields: Header(3) + CdtrInf(1) + Cdtr(7) + UltmtCdtr(7) + CcyAmt(2) + UltmtDbtr(7) + RmtInf(3) + AltPmt(0-2)
+    qr_lines = [
+        "SPC",                    # QRType
+        "0200",                   # Version
+        "1",                      # Coding (UTF-8)
+        iban_clean,               # IBAN
+        # Creditor (S = structured)
+        "S",                      # Address type
+        creditor_name,            # Name
+        creditor_address,         # Street
+        "",                       # Building number (combined in street)
+        creditor_zip,             # Postal code
+        creditor_city,            # City
+        "CH",                     # Country
+        # Ultimate Creditor (empty per spec — reserved)
         "", "", "", "", "", "", "",
-        amount, currency,
-        "S", debtor_name, debtor_address, "", debtor_zip, debtor_city, "CH",
-        "SCOR", "", creditor_ref, ref_info, "EPD",
-    ])
+        # Amount
+        amount,                   # Amount
+        currency,                 # Currency
+        # Ultimate Debtor
+        "S",                      # Address type
+        debtor_name,
+        debtor_address,
+        "",                       # Building number
+        debtor_zip,
+        debtor_city,
+        debtor_country,
+        # Reference
+        "SCOR",                   # Reference type (ISO 11649)
+        creditor_ref,             # Reference (no empty field between type and value)
+        # Additional info
+        ref_info,                 # Unstructured message
+        "EPD",                    # End payment data
+    ]
+    qr_data = "\r\n".join(qr_lines)
 
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=3, border=0)
+    # Generate QR with Swiss cross
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=0)
     qr.add_data(qr_data)
     qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white")
+    qr_pil = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+    # Add Swiss cross overlay (7x7mm area in center per spec)
+    qr_w, qr_h = qr_pil.size
+    cross_size = int(qr_w * 0.18)
+    cross_border = max(1, cross_size // 12)
+    cx, cy = qr_w // 2, qr_h // 2
+    half = cross_size // 2
+    arm_w = max(1, cross_size // 3)
+    arm_half = arm_w // 2
+
+    # White square background
+    for x in range(cx - half - cross_border, cx + half + cross_border + 1):
+        for y in range(cy - half - cross_border, cy + half + cross_border + 1):
+            if 0 <= x < qr_w and 0 <= y < qr_h:
+                qr_pil.putpixel((x, y), (255, 255, 255))
+
+    # Black square
+    for x in range(cx - half, cx + half + 1):
+        for y in range(cy - half, cy + half + 1):
+            if 0 <= x < qr_w and 0 <= y < qr_h:
+                qr_pil.putpixel((x, y), (0, 0, 0))
+
+    # White cross
+    for x in range(cx - arm_half, cx + arm_half + 1):
+        for y in range(cy - half + cross_border + 1, cy + half - cross_border):
+            if 0 <= x < qr_w and 0 <= y < qr_h:
+                qr_pil.putpixel((x, y), (255, 255, 255))
+    for x in range(cx - half + cross_border + 1, cx + half - cross_border):
+        for y in range(cy - arm_half, cy + arm_half + 1):
+            if 0 <= x < qr_w and 0 <= y < qr_h:
+                qr_pil.putpixel((x, y), (255, 255, 255))
+
     qr_buffer = io.BytesIO()
-    qr_img.save(qr_buffer, format="PNG")
+    qr_pil.save(qr_buffer, format="PNG")
     qr_buffer.seek(0)
     qr_image = Image(qr_buffer, width=46 * mm, height=46 * mm)
 
@@ -500,8 +565,6 @@ def _add_qr_bill_page(elements, document, settings, styles):
     scissor_s = ParagraphStyle("Scissor", fontName="Helvetica", fontSize=7, leading=9,
                                textColor=colors.HexColor("#999999"), alignment=TA_CENTER)
 
-    # Push slip to bottom: A4 height = 297mm, slip = 105mm, top margin = 20mm
-    # So we need ~172mm of space before the slip
     elements.append(Spacer(1, 162 * mm))
 
     # Scissor line
@@ -522,6 +585,9 @@ def _add_qr_bill_page(elements, document, settings, styles):
         [Paragraph("Konto / Zahlbar an", label_s)],
         [Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", value_s)],
         [Spacer(1, 1.5 * mm)],
+        [Paragraph("Referenz", label_s)],
+        [Paragraph(creditor_ref_display, value_s)],
+        [Spacer(1, 1.5 * mm)],
         [Paragraph("Zahlbar durch", label_s)],
         [Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", value_s)],
         [Spacer(1, 2 * mm)],
@@ -540,7 +606,6 @@ def _add_qr_bill_page(elements, document, settings, styles):
     ]))
 
     # ── Zahlteil (Payment) ──
-    # Left: QR + currency/amount
     pay_left_items = [
         [Paragraph("Zahlteil", title_s)],
         [Spacer(1, 2 * mm)],
@@ -556,11 +621,13 @@ def _add_qr_bill_page(elements, document, settings, styles):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
 
-    # Right: account info
     pay_right_items = [
-        [Spacer(1, 16 * mm)],  # align with QR top
+        [Spacer(1, 16 * mm)],
         [Paragraph("Konto / Zahlbar an", label_big)],
         [Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", value_big)],
+        [Spacer(1, 1.5 * mm)],
+        [Paragraph("Referenz", label_big)],
+        [Paragraph(creditor_ref_display, value_big)],
         [Spacer(1, 1.5 * mm)],
         [Paragraph("Zahlbar durch", label_big)],
         [Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", value_big)],
@@ -582,7 +649,6 @@ def _add_qr_bill_page(elements, document, settings, styles):
         ("TOPPADDING", (0, 0), (-1, -1), 0),
     ]))
 
-    # Combine receipt | payment
     main_slip = Table(
         [[receipt_table, zahlteil]],
         colWidths=[RECEIPT_W, 103 * mm],
@@ -596,4 +662,3 @@ def _add_qr_bill_page(elements, document, settings, styles):
     ]))
 
     elements.append(main_slip)
-    

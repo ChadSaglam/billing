@@ -1,13 +1,8 @@
-/**
- * Numeric represents a value that the API may return as either a number or
- * a string (Pydantic Decimal serialization). Always use toNum() before arithmetic.
- */
 export type Numeric = number | string;
 
-// ---------------------------------------------------------------------------
-// Client
-// ---------------------------------------------------------------------------
+export * as API from './api.generated';
 
+// Client
 export interface Client {
   id: number;
   customer_number: string;
@@ -23,6 +18,7 @@ export interface Client {
   created_at: string;
   updated_at: string;
 }
+
 export interface CreateClientPayload {
   customer_number: string;
   company_name: string;
@@ -36,9 +32,7 @@ export interface CreateClientPayload {
   notes?: string | null;
 }
 
-// ---------------------------------------------------------------------------
 // Line Item
-// ---------------------------------------------------------------------------
 export interface LineItem {
   id?: number;
   document_id?: number;
@@ -52,9 +46,7 @@ export interface LineItem {
   created_at?: string;
 }
 
-// ---------------------------------------------------------------------------
 // Document
-// ---------------------------------------------------------------------------
 export type DocumentStatus =
   | 'draft'
   | 'sent'
@@ -84,6 +76,15 @@ export interface Document {
   converted_from_id: number | null;
   converted_from?: Document | null;
   line_items: LineItem[];
+  // Payment tracking
+  paid_at: string | null;
+  payment_method: string | null;
+  payment_reference: string | null;
+  // Recurring
+  recurrence: string | null;
+  next_recurrence_date: string | null;
+  // Portal
+  portal_token: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -96,6 +97,7 @@ export interface CreateDocumentPayload {
   discount_percent: number;
   notes?: string | null;
   status?: string;
+  recurrence?: string | null;
   line_items: {
     position: number;
     description: string;
@@ -107,11 +109,7 @@ export interface CreateDocumentPayload {
   }[];
 }
 
-
-// ---------------------------------------------------------------------------
 // Dashboard
-// ---------------------------------------------------------------------------
-
 export interface DashboardStats {
   total_revenue: Numeric;
   outstanding: Numeric;
@@ -120,10 +118,7 @@ export interface DashboardStats {
   recent_documents: Document[];
 }
 
-// ---------------------------------------------------------------------------
 // Company Settings
-// ---------------------------------------------------------------------------
-
 export interface CompanySettings {
   id: number;
   company_name: string;
@@ -146,10 +141,7 @@ export interface CompanySettings {
   pdf_template: string;
 }
 
-// ---------------------------------------------------------------------------
-// Service Template (line item catalog)
-// ---------------------------------------------------------------------------
-
+// Service Template
 export interface ServiceTemplate {
   id: number;
   name: string;
@@ -170,4 +162,49 @@ export interface CreateServicePayload {
   default_price: number;
   is_active?: boolean;
   sort_order?: number;
+}
+
+export interface MonthlyRevenue {
+  month: string;
+  revenue: number;
+  outstanding: number;
+}
+
+export interface StatusCount {
+  status: string;
+  count: number;
+}
+
+export interface DashboardStats {
+  total_revenue: Numeric;
+  outstanding: Numeric;
+  overdue_count: number;
+  total_clients: number;
+  recent_documents: Document[];
+  monthly_revenue: MonthlyRevenue[];
+  status_distribution: StatusCount[];
+}
+
+// Team / Multi-user
+export interface TeamUser {
+  id: number;
+  email: string;
+  full_name: string;
+  role: 'admin' | 'editor' | 'viewer';
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface InviteUserPayload {
+  email: string;
+  full_name: string;
+  role: string;
+}
+
+export interface InviteResponse {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  temp_password: string;
 }

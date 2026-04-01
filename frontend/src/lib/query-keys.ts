@@ -19,4 +19,8 @@ export const queryKeys = {
   settings: {
     all: ['settings'] as const,
   },
+  team: {
+    all: ['team'] as const,
+    list: () => ['team', 'list'] as const,
+  },
 } as const;

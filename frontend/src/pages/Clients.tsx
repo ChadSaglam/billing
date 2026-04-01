@@ -1,24 +1,25 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, Trash2, Users } from 'lucide-react';
-import { getClients, createClient, updateClient, deleteClient } from '@/lib/api';
-import { queryKeys } from '@/lib/query-keys';
-import type { Client, CreateClientPayload } from '@/types';
-import { toast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { Plus, Search, Pencil, Trash2, Users } from "lucide-react";
+import { getClients, createClient, updateClient, deleteClient } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
+import type { Client, CreateClientPayload } from "@/types";
+import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { optimisticDelete } from "@/lib/optimistic";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import { PageHeader, EmptyState, TableSkeleton, ConfirmDialog } from '@/components/shared';
-import { ClientFormDialog, EMPTY_CLIENT } from '@/components/clients/ClientFormDialog';
+} from "@/components/ui/table";
+import { PageHeader, EmptyState, TableSkeleton, ConfirmDialog } from "@/components/shared";
+import { ClientFormDialog, EMPTY_CLIENT } from "@/components/clients/ClientFormDialog";
 
 export default function Clients() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState<CreateClientPayload>(EMPTY_CLIENT);
@@ -31,15 +32,24 @@ export default function Clients() {
 
   const invalidateClients = () => queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
 
- const createMutation = useMutation({
-  mutationFn: createClient,
-  onSuccess: () => { invalidateClients(); setDialogOpen(false); toast({ title: 'Client created successfully' }); },
-});
+  const createMutation = useMutation({
+    mutationFn: createClient,
+    onSuccess: () => {
+      invalidateClients();
+      setDialogOpen(false);
+      toast({ title: "Client created successfully" });
+    },
+  });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: Partial<CreateClientPayload> }) => updateClient(id, payload),
-    onSuccess: () => { invalidateClients(); setDialogOpen(false); toast({ title: 'Client updated successfully' }); },
-    onError: () => toast({ title: 'Failed to update client', variant: 'destructive' }),
+    mutationFn: ({ id, payload }: { id: number; payload: Partial<CreateClientPayload> }) =>
+      updateClient(id, payload),
+    onSuccess: () => {
+      invalidateClients();
+      setDialogOpen(false);
+      toast({ title: "Client updated successfully" });
+    },
+    onError: () => toast({ title: "Failed to update client", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -61,7 +71,11 @@ export default function Clients() {
     onSuccess: () => toast({ title: "Client deleted" }),
   });
 
-  const openCreate = () => { setEditingClient(null); setForm(EMPTY_CLIENT); setDialogOpen(true); };
+  const openCreate = () => {
+    setEditingClient(null);
+    setForm(EMPTY_CLIENT);
+    setDialogOpen(true);
+  };
 
   const openEdit = (client: Client, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -69,14 +83,14 @@ export default function Clients() {
     setForm({
       customer_number: client.customer_number,
       company_name: client.company_name,
-      contact_person: client.contact_person || '',
-      email: client.email || '',
-      phone: client.phone || '',
+      contact_person: client.contact_person || "",
+      email: client.email || "",
+      phone: client.phone || "",
       street: client.street,
       postal_code: client.postal_code,
       city: client.city,
       country: client.country,
-      notes: client.notes || '',
+      notes: client.notes || "",
     });
     setDialogOpen(true);
   };
@@ -101,7 +115,7 @@ export default function Clients() {
         description="Manage your client database"
         actions={
           <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />New Client
+            <Plus className="mr-2 h-4 w-4" /> New Client
           </Button>
         }
       />
@@ -119,45 +133,84 @@ export default function Clients() {
       {isLoading ? (
         <TableSkeleton rows={5} columns={6} />
       ) : clients && clients.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Customer Nr</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>City</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="w-24">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer Nr</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>City</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map((client) => (
+                  <TableRow
+                    key={client.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/clients/${client.id}`)}
+                  >
+                    <TableCell className="font-mono">{client.customer_number}</TableCell>
+                    <TableCell className="font-medium">{client.company_name}</TableCell>
+                    <TableCell>{client.contact_person || "—"}</TableCell>
+                    <TableCell>{client.city}</TableCell>
+                    <TableCell>{client.email || "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={(e) => openEdit(client, e)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(client.id); }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile card list */}
+          <div className="md:hidden space-y-2">
             {clients.map((client) => (
-              <TableRow key={client.id} className="cursor-pointer" onClick={() => navigate(`/clients/${client.id}`)}>
-                <TableCell className="font-mono">{client.customer_number}</TableCell>
-                <TableCell className="font-medium">{client.company_name}</TableCell>
-                <TableCell>{client.contact_person || '-'}</TableCell>
-                <TableCell>{client.city}</TableCell>
-                <TableCell>{client.email || '-'}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={(e) => openEdit(client, e)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteTarget(client.id); }}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+              <Card
+                key={client.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted"
+                onClick={() => navigate(`/clients/${client.id}`)}
+              >
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium truncate max-w-[70%]">{client.company_name}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{client.customer_number}</span>
                   </div>
-                </TableCell>
-              </TableRow>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span className="truncate max-w-[50%]">{client.contact_person || client.city || "—"}</span>
+                    <span className="truncate max-w-[45%] text-right">{client.email || "—"}</span>
+                  </div>
+                </div>
+              </Card>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+        </>
       ) : (
         <EmptyState
+          preset="clients"
           icon={Users}
           title="No clients found"
           description="Add your first client to get started"
-          action={<Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />New Client</Button>}
+          action={
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" /> New Client
+            </Button>
+          }
         />
       )}
 

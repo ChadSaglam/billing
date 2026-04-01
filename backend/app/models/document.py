@@ -1,4 +1,5 @@
 import datetime as dt
+import secrets
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
@@ -13,10 +14,6 @@ class Document(Base):
         CheckConstraint(
             "document_type IN ('offerte', 'rechnung')",
             name="ck_document_type",
-        ),
-        CheckConstraint(
-            "status IN ('draft', 'sent', 'accepted', 'rejected', 'paid', 'overdue', 'cancelled')",
-            name="ck_document_status",
         ),
     )
 
@@ -40,6 +37,18 @@ class Document(Base):
         ForeignKey("documents.id"), nullable=True
     )
 
+    # Payment tracking
+    paid_at: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    payment_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    payment_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Recurring invoices
+    recurrence: Mapped[str | None] = mapped_column(String(20), nullable=True)  # monthly/quarterly/yearly
+    next_recurrence_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+
+    # Client portal
+    portal_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
+
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow
@@ -52,3 +61,7 @@ class Document(Base):
     converted_from: Mapped["Document | None"] = relationship(
         remote_side="Document.id", foreign_keys=[converted_from_id]
     )
+
+    def generate_portal_token(self) -> str:
+        self.portal_token = secrets.token_urlsafe(48)
+        return self.portal_token

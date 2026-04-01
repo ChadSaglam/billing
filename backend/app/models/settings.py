@@ -5,7 +5,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
-
 class CompanySettings(Base):
     __tablename__ = "company_settings"
 
@@ -31,4 +30,4 @@ class CompanySettings(Base):
     next_invoice_number: Mapped[int] = mapped_column(default=1326)
     next_offerte_number: Mapped[int] = mapped_column(default=2001)
     pdf_template: Mapped[str] = mapped_column(String(50), default="modern")
-
+    onboarding_completed: Mapped[bool] = mapped_column(default=False)

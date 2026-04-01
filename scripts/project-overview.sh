@@ -5,29 +5,38 @@
 # ─────────────────────────────────────────────────────────
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
+
 CYAN="\033[36m"; GREEN="\033[32m"; YELLOW="\033[33m"; RED="\033[31m"; RESET="\033[0m"; BOLD="\033[1m"; DIM="\033[2m"
 COMPOSE="docker compose"
 BACKEND_URL="http://localhost:8001"
 FRONTEND_URL="http://localhost:5173"
-DB_USER="chadev"
-DB_NAME="chadev_billing"
+DB_USER="${POSTGRES_USER:-chadev}"
+DB_NAME="${POSTGRES_DB:-chadev_billing}"
+
+if [[ -f ".env" ]]; then
+  set -a; source .env; set +a
+fi
 
 echo -e "${BOLD}🧾 chadev-billing — Project Overview${RESET}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 # ── Git ─────────────────────────────────────────────────
-if [ -d .git ]; then
-  BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
-  COMMIT=$(git log -1 --format="%h %s" 2>/dev/null || echo "no commits")
-  DIRTY=$(git status --porcelain 2>/dev/null | wc -l | tr -d " ")
-  TAGS=$(git tag --sort=-version:refname 2>/dev/null | head -1)
+if [[ -d .git ]]; then
+  branch=$(git branch --show-current 2>/dev/null || echo "unknown")
+  commit=$(git log -1 --format="%h %s" 2>/dev/null || echo "no commits")
+  dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d " ")
+  latest_tag=$(git tag --sort=-version:refname 2>/dev/null | head -1)
+
   echo -e "${BOLD}Git${RESET}"
-  echo "  Branch:  ${BRANCH}"
-  echo "  Last:    ${COMMIT}"
-  [ -n "$TAGS" ] && echo "  Tag:     ${TAGS}"
-  if [ "$DIRTY" -gt 0 ]; then
-    echo -e "  Status:  ${YELLOW}${DIRTY} uncommitted changes${RESET}"
+  echo "  Branch:  ${branch}"
+  echo "  Last:    ${commit}"
+  [[ -n "$latest_tag" ]] && echo "  Tag:     ${latest_tag}"
+  if [[ "$dirty" -gt 0 ]]; then
+    echo -e "  Status:  ${YELLOW}${dirty} uncommitted changes${RESET}"
   else
     echo -e "  Status:  ${GREEN}Clean${RESET}"
   fi
@@ -36,14 +45,14 @@ fi
 
 # ── Code Stats ──────────────────────────────────────────
 echo -e "${BOLD}Code Stats${RESET}"
-PY_FILES=$(find backend -name "*.py" -not -path "*__pycache__*" -not -path "*/venv/*" -not -path "*alembic/versions*" 2>/dev/null | wc -l | tr -d " ")
-PY_LINES=$(find backend -name "*.py" -not -path "*__pycache__*" -not -path "*/venv/*" -not -path "*alembic/versions*" -exec cat {} + 2>/dev/null | wc -l | tr -d " ")
-TSX_FILES=$(find frontend/src -name "*.tsx" -o -name "*.ts" 2>/dev/null | wc -l | tr -d " ")
-TSX_LINES=$(find frontend/src \( -name "*.tsx" -o -name "*.ts" \) -exec cat {} + 2>/dev/null | wc -l | tr -d " ")
+py_files=$(find backend -name "*.py" -not -path "*__pycache__*" -not -path "*/venv/*" -not -path "*alembic/versions*" 2>/dev/null | wc -l | tr -d " ")
+py_lines=$(find backend -name "*.py" -not -path "*__pycache__*" -not -path "*/venv/*" -not -path "*alembic/versions*" -exec cat {} + 2>/dev/null | wc -l | tr -d " ")
+tsx_files=$(find frontend/src -name "*.tsx" -o -name "*.ts" 2>/dev/null | wc -l | tr -d " ")
+tsx_lines=$(find frontend/src \( -name "*.tsx" -o -name "*.ts" \) -exec cat {} + 2>/dev/null | wc -l | tr -d " ")
 
-echo "  Python:     ${PY_FILES} files, ${PY_LINES} lines"
-echo "  TypeScript: ${TSX_FILES} files, ${TSX_LINES} lines"
-echo "  Total:      $(( PY_FILES + TSX_FILES )) files, $(( PY_LINES + TSX_LINES )) lines"
+echo "  Python:     ${py_files} files, ${py_lines} lines"
+echo "  TypeScript: ${tsx_files} files, ${tsx_lines} lines"
+echo "  Total:      $(( py_files + tsx_files )) files, $(( py_lines + tsx_lines )) lines"
 echo ""
 
 # ── Architecture ────────────────────────────────────────
@@ -64,42 +73,42 @@ echo ""
 
 echo -e "  ${DIM}API Routers:${RESET}"
 for f in backend/app/api/*.py; do
-  [ ! -f "$f" ] && continue
-  NAME=$(basename "$f" .py)
-  [ "$NAME" = "__init__" ] && continue
-  ROUTES=$(grep -cE "^@router\.(get|post|put|delete|patch)|^\s+@router\.(get|post|put|delete|patch)" "$f" 2>/dev/null || echo "0")
-  printf "    %-20s %2s routes\n" "$NAME" "$ROUTES"
+  [[ ! -f "$f" ]] && continue
+  name=$(basename "$f" .py)
+  [[ "$name" == "__init__" ]] && continue
+  routes=$(grep -cE "^@router\.(get|post|put|delete|patch)|^\s+@router\.(get|post|put|delete|patch)" "$f" 2>/dev/null || echo "0")
+  printf "    %-20s %2s routes\n" "$name" "$routes"
 done
 echo ""
 
 echo -e "  ${DIM}Models:${RESET}"
 for f in backend/app/models/*.py; do
-  [ ! -f "$f" ] && continue
-  NAME=$(basename "$f" .py)
-  [ "$NAME" = "__init__" ] && continue
-  COLS=$(grep -cE "^\s+\w+\s*=\s*Column\b|^\s+\w+:\s*Mapped" "$f" 2>/dev/null || echo "?")
-  printf "    %-20s %s columns\n" "$NAME" "$COLS"
+  [[ ! -f "$f" ]] && continue
+  name=$(basename "$f" .py)
+  [[ "$name" == "__init__" ]] && continue
+  cols=$(grep -cE "^\s+\w+\s*=\s*Column\b|^\s+\w+:\s*Mapped" "$f" 2>/dev/null || echo "?")
+  printf "    %-20s %s columns\n" "$name" "$cols"
 done
 echo ""
 
 echo -e "  ${DIM}Services:${RESET}"
 for f in backend/app/services/*.py; do
-  [ ! -f "$f" ] && continue
-  NAME=$(basename "$f" .py)
-  [ "$NAME" = "__init__" ] && continue
-  FUNCS=$(grep -cE "^(async )?def " "$f" 2>/dev/null || echo "0")
-  LINES=$(wc -l < "$f" | tr -d " ")
-  printf "    %-20s %2s functions  %s lines\n" "$NAME" "$FUNCS" "$LINES"
+  [[ ! -f "$f" ]] && continue
+  name=$(basename "$f" .py)
+  [[ "$name" == "__init__" ]] && continue
+  funcs=$(grep -cE "^(async )?def " "$f" 2>/dev/null || echo "0")
+  lines=$(wc -l < "$f" | tr -d " ")
+  printf "    %-20s %2s functions  %s lines\n" "$name" "$funcs" "$lines"
 done
 echo ""
 
 echo -e "  ${DIM}Schemas:${RESET}"
 for f in backend/app/schemas/*.py; do
-  [ ! -f "$f" ] && continue
-  NAME=$(basename "$f" .py)
-  [ "$NAME" = "__init__" ] && continue
-  CLASSES=$(grep -cE "^class " "$f" 2>/dev/null || echo "0")
-  printf "    %-20s %2s schemas\n" "$NAME" "$CLASSES"
+  [[ ! -f "$f" ]] && continue
+  name=$(basename "$f" .py)
+  [[ "$name" == "__init__" ]] && continue
+  classes=$(grep -cE "^class " "$f" 2>/dev/null || echo "0")
+  printf "    %-20s %2s schemas\n" "$name" "$classes"
 done
 echo ""
 
@@ -111,28 +120,28 @@ echo "  Node:       $(node --version 2>/dev/null || echo '?')"
 echo ""
 
 echo -e "  ${DIM}Pages:${RESET}"
-for f in $(find frontend/src/pages -name "*.tsx" 2>/dev/null | sort); do
-  NAME=$(basename "$f" .tsx)
-  LINES=$(wc -l < "$f" | tr -d " ")
-  printf "    %-25s %s lines\n" "$NAME" "$LINES"
-done
+while IFS= read -r f; do
+  name=$(basename "$f" .tsx)
+  lines=$(wc -l < "$f" | tr -d " ")
+  printf "    %-25s %s lines\n" "$name" "$lines"
+done < <(find frontend/src/pages -name "*.tsx" 2>/dev/null | sort)
 echo ""
 
 echo -e "  ${DIM}Components:${RESET}"
-for f in $(find frontend/src/components -name "*.tsx" -not -path "*/ui/*" 2>/dev/null | sort); do
-  NAME=$(basename "$f" .tsx)
-  LINES=$(wc -l < "$f" | tr -d " ")
-  printf "    %-25s %s lines\n" "$NAME" "$LINES"
-done
-UI_COUNT=$(find frontend/src/components/ui -name "*.tsx" 2>/dev/null | wc -l | tr -d " ")
-echo -e "    ${DIM}+ ${UI_COUNT} shadcn/ui primitives${RESET}"
+while IFS= read -r f; do
+  name=$(basename "$f" .tsx)
+  lines=$(wc -l < "$f" | tr -d " ")
+  printf "    %-25s %s lines\n" "$name" "$lines"
+done < <(find frontend/src/components -name "*.tsx" -not -path "*/ui/*" 2>/dev/null | sort)
+ui_count=$(find frontend/src/components/ui -name "*.tsx" 2>/dev/null | wc -l | tr -d " ")
+echo -e "    ${DIM}+ ${ui_count} shadcn/ui primitives${RESET}"
 echo ""
 
 echo -e "  ${DIM}Hooks:${RESET}"
-for f in $(find frontend/src/hooks -name "*.ts" -o -name "*.tsx" 2>/dev/null | sort); do
-  NAME=$(basename "$f" | sed 's/\.\(ts\|tsx\)$//')
-  printf "    %s\n" "$NAME"
-done
+while IFS= read -r f; do
+  name=$(basename "$f" | sed 's/\.\(ts\|tsx\)$//')
+  printf "    %s\n" "$name"
+done < <(find frontend/src/hooks -name "*.ts" -o -name "*.tsx" 2>/dev/null | sort)
 echo ""
 
 # ── Docker Compose ──────────────────────────────────────
@@ -167,11 +176,11 @@ else
 fi
 
 if $COMPOSE exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; then
-  DB_SIZE=$($COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -tAc \
+  db_size=$($COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -tAc \
     "SELECT pg_size_pretty(pg_database_size('${DB_NAME}'));" 2>/dev/null | tr -d " " || echo "?")
-  TABLE_COUNT=$($COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -tAc \
+  table_count=$($COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -tAc \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "?")
-  echo -e "  PostgreSQL: ${GREEN}● Running${RESET} (${DB_SIZE}, ${TABLE_COUNT} tables)"
+  echo -e "  PostgreSQL: ${GREEN}● Running${RESET} (${db_size}, ${table_count} tables)"
 
   echo ""
   echo -e "  ${DIM}Table row counts:${RESET}"
@@ -185,12 +194,12 @@ echo ""
 
 # ── Environment ─────────────────────────────────────────
 echo -e "${BOLD}Environment${RESET}"
-for ENV_FILE in .env backend/.env frontend/.env; do
-  if [ -f "$ENV_FILE" ]; then
-    VARS=$(grep -cE "^[A-Z_]+=" "$ENV_FILE" 2>/dev/null || echo "0")
-    echo -e "  ${GREEN}✓${RESET} ${ENV_FILE} (${VARS} vars)"
+for env_file in .env backend/.env frontend/.env; do
+  if [[ -f "$env_file" ]]; then
+    vars=$(grep -cE "^[A-Z_]+=" "$env_file" 2>/dev/null || echo "0")
+    echo -e "  ${GREEN}✓${RESET} ${env_file} (${vars} vars)"
   else
-    echo -e "  ${DIM}⊘${RESET} ${ENV_FILE} not present"
+    echo -e "  ${DIM}⊘${RESET} ${env_file} not present"
   fi
 done
 
@@ -198,13 +207,12 @@ echo ""
 
 # ── Disk Usage ──────────────────────────────────────────
 echo -e "${BOLD}Disk Usage${RESET}"
-# macOS du doesn't support --exclude, use find + pipe
-BACKEND_SIZE=$(find backend -not -path "*/venv/*" -not -path "*/__pycache__/*" -type f -exec cat {} + 2>/dev/null | wc -c | awk '{printf "%.1fM", $1/1048576}')
-FRONTEND_SIZE=$(find frontend/src -type f -exec cat {} + 2>/dev/null | wc -c | awk '{printf "%.0fK", $1/1024}')
-NM_SIZE=$(du -sh frontend/node_modules 2>/dev/null | cut -f1 || echo "N/A")
-echo "  Backend:       ${BACKEND_SIZE}"
-echo "  Frontend src:  ${FRONTEND_SIZE}"
-echo "  node_modules:  ${NM_SIZE}"
+backend_size=$(find backend -not -path "*/venv/*" -not -path "*/__pycache__/*" -type f -exec cat {} + 2>/dev/null | wc -c | awk '{printf "%.1fM", $1/1048576}')
+frontend_size=$(find frontend/src -type f -exec cat {} + 2>/dev/null | wc -c | awk '{printf "%.0fK", $1/1024}')
+nm_size=$(du -sh frontend/node_modules 2>/dev/null | cut -f1 || echo "N/A")
+echo "  Backend:       ${backend_size}"
+echo "  Frontend src:  ${frontend_size}"
+echo "  node_modules:  ${nm_size}"
 echo ""
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

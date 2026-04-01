@@ -9,30 +9,67 @@ import type {
   ServiceTemplate,
   CreateServicePayload,
 } from '@/types';
+import { getToken, getRefreshToken, setToken, setRefreshToken, clearTokens } from '@/lib/auth';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
 });
 
-// Request interceptor — attach JWT when available
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Response interceptor — global error handling
+let isRefreshing = false;
+let refreshQueue: Array<(token: string) => void> = [];
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+  async (error) => {
+    const original = error.config;
+
+    if (error.response?.status === 401 && !original._retry) {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        clearTokens();
+        if (window.location.pathname !== '/login') window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          refreshQueue.push((newToken) => {
+            original.headers.Authorization = `Bearer ${newToken}`;
+            resolve(api(original));
+          });
+        });
+      }
+
+      original._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axios.post(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:8001'}/api/auth/refresh`,
+          { refresh_token: refreshToken }
+        );
+        setToken(data.access_token);
+        setRefreshToken(data.refresh_token);
+        api.defaults.headers.common.Authorization = `Bearer ${data.access_token}`;
+        refreshQueue.forEach((cb) => cb(data.access_token));
+        refreshQueue = [];
+        original.headers.Authorization = `Bearer ${data.access_token}`;
+        return api(original);
+      } catch {
+        clearTokens();
+        if (window.location.pathname !== '/login') window.location.href = '/login';
+        return Promise.reject(error);
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   }
 );
@@ -190,12 +227,16 @@ export interface AuthUser {
 }
 
 export const login = async (payload: LoginPayload): Promise<AuthResponse> => {
-  const { data } = await api.post<AuthResponse>('/api/auth/login', payload);
+  const { data } = await api.post('/api/auth/login', payload);
+  setToken(data.access_token);
+  setRefreshToken(data.refresh_token);
   return data;
 };
 
 export const register = async (payload: RegisterPayload): Promise<AuthResponse> => {
-  const { data } = await api.post<AuthResponse>('/api/auth/register', payload);
+  const { data } = await api.post('/api/auth/register', payload);
+  setToken(data.access_token);
+  setRefreshToken(data.refresh_token);
   return data;
 };
 
@@ -214,6 +255,101 @@ export const uploadLogo = async (file: File): Promise<{ logo_url: string }> => {
   return data;
 };
 
+// ── Bulk Actions ─────────────────────────────────────
+export const bulkUpdateStatus = async (payload: {
+  document_ids: number[];
+  status: string;
+  paid_at?: string;
+  payment_method?: string;
+  payment_reference?: string;
+}): Promise<{ updated: number; total: number }> => {
+  const { data } = await api.post('/api/documents/bulk/status', payload);
+  return data;
+};
 
+export const bulkSendEmail = async (document_ids: number[]): Promise<{ sent: number; errors: string[] }> => {
+  const { data } = await api.post('/api/documents/bulk/send-email', { document_ids });
+  return data;
+};
+
+export const bulkDownloadPdfZip = async (document_ids: number[]): Promise<void> => {
+  const res = await api.post('/api/documents/bulk/pdf-zip', { document_ids }, { responseType: 'blob' });
+  const blob = new Blob([res.data], { type: 'application/zip' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'documents.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+export const generatePortalToken = async (docId: number): Promise<Document> => {
+  const { data } = await api.post(`/api/documents/${docId}/portal-token`);
+  return data;
+};
+
+// ── Portal (public, no auth) ─────────────────────────
+export const getPortalDocument = async (token: string) => {
+  const { data } = await api.get(`/api/portal/${token}`);
+  return data;
+};
+
+export const downloadPortalPdf = async (token: string): Promise<void> => {
+  const res = await api.get(`/api/portal/${token}/pdf`, { responseType: 'blob' });
+  const blob = new Blob([res.data], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'document.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+export const updateDocumentStatusWithPayment = async (
+  id: number,
+  payload: { status: string; paid_at?: string; payment_method?: string; payment_reference?: string }
+): Promise<Document> => {
+  const { data } = await api.patch(`/api/documents/${id}/status`, payload);
+  return data;
+};
+
+export const duplicateDocument = async (id: number): Promise<Document> => {
+  const { data } = await api.post<Document>(`/api/documents/${id}/duplicate`);
+  return data;
+};
+
+// ── Team / Users ─────────────────────────────────────
+export const getTeamUsers = async (): Promise<import('@/types').TeamUser[]> => {
+  const { data } = await api.get('/api/users');
+  return data;
+};
+
+export const inviteUser = async (
+  payload: import('@/types').InviteUserPayload
+): Promise<import('@/types').InviteResponse> => {
+  const { data } = await api.post('/api/users/invite', payload);
+  return data;
+};
+
+export const updateUser = async (
+  id: number,
+  payload: { full_name?: string; role?: string; is_active?: boolean }
+): Promise<import('@/types').TeamUser> => {
+  const { data } = await api.patch(`/api/users/${id}`, payload);
+  return data;
+};
+
+export const removeUser = async (id: number): Promise<void> => {
+  await api.delete(`/api/users/${id}`);
+};
+
+// ── Onboarding ───────────────────────────────────────
+export const completeOnboarding = async (): Promise<void> => {
+  await api.post('/api/settings/onboarding-complete');
+};
 
 export default api;

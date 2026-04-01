@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import get_tenant_id
@@ -40,9 +41,20 @@ def get_client(client_id: int, db: Session = Depends(get_db), tenant_id: int = D
 
 @router.post("", response_model=ClientRead, status_code=201)
 def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+    existing = db.query(Client).filter(
+        Client.tenant_id == tenant_id,
+        Client.customer_number == data.customer_number,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Customer number {data.customer_number} already exists")
+
     client = Client(**data.model_dump(), tenant_id=tenant_id)
     db.add(client)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Duplicate client entry")
     db.refresh(client)
     return client
 

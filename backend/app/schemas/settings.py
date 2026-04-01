@@ -20,11 +20,12 @@ class SettingsBase(BaseModel):
     next_invoice_number: int
     next_offerte_number: int
     pdf_template: str
+    onboarding_completed: bool
 
 class SettingsRead(SettingsBase):
     id: int
     model_config = {"from_attributes": True}
-    pdf_template: str
+
 
 class SettingsUpdate(BaseModel):
     company_name: str | None = None
@@ -45,3 +46,4 @@ class SettingsUpdate(BaseModel):
     next_invoice_number: int | None = None
     next_offerte_number: int | None = None
     pdf_template: str | None = None
+    onboarding_completed: bool | None = None

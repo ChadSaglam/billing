@@ -1,22 +1,22 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Mail, Phone, MapPin } from 'lucide-react';
-import { getClient, updateClient, getDocuments } from '@/lib/api';
-import { queryKeys } from '@/lib/query-keys';
-import type { CreateClientPayload } from '@/types';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { toast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Mail, Phone, MapPin } from "lucide-react";
+import { getClient, updateClient, getDocuments } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
+import type { CreateClientPayload } from "@/types";
+import { formatCurrency, formatDate, toNum } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import { PageHeader, StatusBadge, TableSkeleton, EmptyState } from '@/components/shared';
-import { ClientFormDialog, EMPTY_CLIENT } from '@/components/clients/ClientFormDialog';
+} from "@/components/ui/table";
+import { PageHeader, StatusBadge, TableSkeleton, EmptyState } from "@/components/shared";
+import { ClientFormDialog, EMPTY_CLIENT } from "@/components/clients/ClientFormDialog";
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -42,9 +42,9 @@ export default function ClientDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients.detail(id!) });
       setEditOpen(false);
-      toast({ title: 'Client updated successfully' });
+      toast({ title: "Client updated successfully" });
     },
-    onError: () => toast({ title: 'Failed to update client', variant: 'destructive' }),
+    onError: () => toast({ title: "Failed to update client", variant: "destructive" }),
   });
 
   const openEdit = () => {
@@ -52,14 +52,14 @@ export default function ClientDetail() {
     setForm({
       customer_number: client.customer_number,
       company_name: client.company_name,
-      contact_person: client.contact_person || '',
-      email: client.email || '',
-      phone: client.phone || '',
+      contact_person: client.contact_person || "",
+      email: client.email || "",
+      phone: client.phone || "",
       street: client.street,
       postal_code: client.postal_code,
       city: client.city,
       country: client.country,
-      notes: client.notes || '',
+      notes: client.notes || "",
     });
     setEditOpen(true);
   };
@@ -74,12 +74,20 @@ export default function ClientDetail() {
     return type ? documents.filter((d) => d.document_type === type) : documents;
   };
 
+  const totalInvoiced = documents
+    ? documents.filter((d) => d.document_type === "rechnung").reduce((s, d) => s + toNum(d.total), 0)
+    : 0;
+  const totalPaid = documents
+    ? documents.filter((d) => d.status === "paid").reduce((s, d) => s + toNum(d.total), 0)
+    : 0;
+  const totalOutstanding = documents
+    ? documents.filter((d) => ["sent", "overdue"].includes(d.status)).reduce((s, d) => s + toNum(d.total), 0)
+    : 0;
+
   const renderDocumentsTable = (type?: string) => {
     const filtered = filterDocs(type);
     if (docsLoading) return <TableSkeleton rows={3} columns={5} />;
-    if (filtered.length === 0) {
-      return <EmptyState title="No documents found" />;
-    }
+    if (filtered.length === 0) return <EmptyState preset="documents" title="No documents found" />;
     return (
       <Table>
         <TableHeader>
@@ -122,7 +130,7 @@ export default function ClientDetail() {
     return (
       <EmptyState
         title="Client not found"
-        action={<Button variant="link" onClick={() => navigate('/clients')}>Back to Clients</Button>}
+        action={<Button variant="link" onClick={() => navigate("/clients")}>Back to Clients</Button>}
       />
     );
   }
@@ -131,15 +139,40 @@ export default function ClientDetail() {
     <div className="space-y-6">
       <PageHeader
         title={client.company_name}
-        description={`Customer #${client.customer_number}`}
+        description={`Customer ${client.customer_number}`}
         backButton
         actions={
           <Button variant="outline" onClick={openEdit}>
-            <Pencil className="mr-2 h-4 w-4" />Edit Client
+            <Pencil className="mr-2 h-4 w-4" /> Edit Client
           </Button>
         }
       />
 
+      {/* Revenue KPIs */}
+      {documents && documents.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-xs text-muted-foreground">Total Invoiced</p>
+              <p className="text-xl font-bold tabular-nums">{formatCurrency(totalInvoiced)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-xs text-muted-foreground">Paid</p>
+              <p className="text-xl font-bold tabular-nums text-green-600">{formatCurrency(totalPaid)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-xs text-muted-foreground">Outstanding</p>
+              <p className="text-xl font-bold tabular-nums text-orange-600">{formatCurrency(totalOutstanding)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Client Info */}
       <Card>
         <CardContent className="pt-6">
           <div className="grid gap-4 md:grid-cols-3">
@@ -175,17 +208,18 @@ export default function ClientDetail() {
           </div>
           {client.contact_person && (
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm"><span className="font-medium">Contact: </span>{client.contact_person}</p>
+              <p className="text-sm"><span className="font-medium">Contact </span>{client.contact_person}</p>
             </div>
           )}
           {client.notes && (
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm"><span className="font-medium">Notes: </span>{client.notes}</p>
+              <p className="text-sm"><span className="font-medium">Notes </span>{client.notes}</p>
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Documents */}
       <Card>
         <CardHeader><CardTitle className="text-lg">Documents</CardTitle></CardHeader>
         <CardContent>
@@ -196,8 +230,8 @@ export default function ClientDetail() {
               <TabsTrigger value="rechnung">Rechnungen</TabsTrigger>
             </TabsList>
             <TabsContent value="all">{renderDocumentsTable()}</TabsContent>
-            <TabsContent value="offerte">{renderDocumentsTable('offerte')}</TabsContent>
-            <TabsContent value="rechnung">{renderDocumentsTable('rechnung')}</TabsContent>
+            <TabsContent value="offerte">{renderDocumentsTable("offerte")}</TabsContent>
+            <TabsContent value="rechnung">{renderDocumentsTable("rechnung")}</TabsContent>
           </Tabs>
         </CardContent>
       </Card>

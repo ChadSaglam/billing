@@ -1,21 +1,10 @@
 import { useCallback, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  Settings,
-  Sun,
-  Moon,
-  Menu,
-  X,
-  Receipt,
-  Search,
-  LogOut,
-  Bell,
-  PanelLeftClose,
-  PanelLeft,
-  User,
+  LayoutDashboard, Users, SettingsIcon,
+  FileText, Settings, Sun, Moon, Menu,
+  X, Receipt, Search, LogOut,Bell,
+  PanelLeftClose, PanelLeft, User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearToken } from '@/lib/auth';
@@ -68,6 +57,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(false)}
           />
         )}
+        {/* Mobile bottom tab bar */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex items-center justify-around h-14">
+            {[
+              { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+              { to: '/clients', icon: Users, label: 'Clients' },
+              { to: '/documents', icon: FileText, label: 'Documents' },
+              { to: '/settings', icon: SettingsIcon, label: 'Settings' },
+            ].map((item) => {
+              const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors ${
+                    active ? 'text-primary' : 'text-muted-foreground'
+                  }`}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
 
         {/* Sidebar */}
         <aside
@@ -236,7 +251,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </header>
 
           {/* Page content */}
-          <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+          <main className="flex-1 overflow-y-auto p-4 pb-20 md:pb-4 lg:p-8">
             {children}
           </main>
         </div>

@@ -2,8 +2,20 @@
 # ─────────────────────────────────────────────────────────
 # test.sh — Comprehensive pre-deploy test suite
 # chadev-billing: Invoicing & Document Management
+#
+# Usage:
+#   ./scripts/test.sh              # run all checks
+#   ./scripts/test.sh syntax       # run specific section
+#   ./scripts/test.sh api docker   # run multiple sections
+#
+# Sections: syntax imports deps frontend docker db
+#           alembic api frontend-live ports security prod types e2e
 # ─────────────────────────────────────────────────────────
 set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
 
 CYAN="\033[36m"; GREEN="\033[32m"; RED="\033[31m"; YELLOW="\033[33m"; DIM="\033[2m"; RESET="\033[0m"; BOLD="\033[1m"
 ERRORS=0; WARNINGS=0; PASSED=0
@@ -11,15 +23,24 @@ ERRORS=0; WARNINGS=0; PASSED=0
 COMPOSE="docker compose"
 BACKEND_URL="http://localhost:8001"
 FRONTEND_URL="http://localhost:5173"
-DB_USER="chadev"
-DB_NAME="chadev_billing"
+DB_USER="${POSTGRES_USER:-chadev}"
+DB_NAME="${POSTGRES_DB:-chadev_billing}"
 
-# Load .env if present
-if [ -f ".env" ]; then
-  set -a
-  source .env
-  set +a
+if [[ -f ".env" ]]; then
+  set -a; source .env; set +a
 fi
+
+# Determine which sections to run
+REQUESTED_SECTIONS=("$@")
+run_all() { [[ ${#REQUESTED_SECTIONS[@]} -eq 0 ]]; }
+should_run() {
+  run_all && return 0
+  local section="$1"
+  for s in "${REQUESTED_SECTIONS[@]}"; do
+    [[ "$s" == "$section" ]] && return 0
+  done
+  return 1
+}
 
 echo -e "${BOLD}🧾 chadev-billing — Pre-Deploy Tests${RESET}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -31,16 +52,17 @@ warn() { echo -e "  ${YELLOW}⊘${RESET} $1"; WARNINGS=$((WARNINGS + 1)); }
 info() { echo -e "  ${DIM}$1${RESET}"; }
 
 # ── 1. Backend Syntax ─────────────────────────────────
+if should_run "syntax"; then
 echo -e "${BOLD}1. Backend Syntax${RESET}"
 
 cd backend
 
 compile_check() {
   local dir="$1" label="$2" skip_files="${3:-__init__.py}"
-  local err_count=0
-  local file_count=0
-  for f in ${dir}/*.py; do
-    [ ! -f "$f" ] && continue
+  local err_count=0 file_count=0
+  for f in "${dir}"/*.py; do
+    [[ ! -f "$f" ]] && continue
+    local base
     base=$(basename "$f")
     echo "$skip_files" | grep -qw "$base" && continue
     file_count=$((file_count + 1))
@@ -49,92 +71,94 @@ compile_check() {
       err_count=$((err_count + 1))
     fi
   done
-  [ $err_count -eq 0 ] && [ $file_count -gt 0 ] && pass "All ${label} compile (${file_count} files)"
+  [[ $err_count -eq 0 ]] && [[ $file_count -gt 0 ]] && pass "All ${label} compile (${file_count} files)"
 }
 
-python3 -m py_compile app/main.py 2>/dev/null && pass "main.py compiles" || fail "main.py has syntax errors"
-python3 -m py_compile app/config.py 2>/dev/null && pass "config.py compiles" || fail "config.py has syntax errors"
-python3 -m py_compile app/database.py 2>/dev/null && pass "database.py compiles" || fail "database.py has syntax errors"
+for core_file in main config database; do
+  if python3 -m py_compile "app/${core_file}.py" 2>/dev/null; then
+    pass "${core_file}.py compiles"
+  else
+    fail "${core_file}.py has syntax errors"
+  fi
+done
 
-compile_check "app/api" "API routers" "__init__.py"
-compile_check "app/models" "models" "__init__.py"
-compile_check "app/schemas" "schemas" "__init__.py"
-compile_check "app/services" "services" "__init__.py"
+compile_check "app/api" "API routers"
+compile_check "app/models" "models"
+compile_check "app/schemas" "schemas"
+compile_check "app/services" "services"
 
-cd ..
+cd "$PROJECT_DIR"
 echo ""
+fi
 
 # ── 2. Backend Imports ────────────────────────────────
+if should_run "imports"; then
 echo -e "${BOLD}2. Backend Imports${RESET}"
 
-# Always test via Docker (local Python 3.13 lacks psycopg2 C extension)
-for mod_label in "app.main:app:FastAPI app" "app.config:*:Config module" "app.database:*:Database module" \
-                 "app.services.number_generator:*:number_generator" "app.services.pdf_generator:*:pdf_generator"; do
-  mod=$(echo "$mod_label" | cut -d: -f1)
-  attr=$(echo "$mod_label" | cut -d: -f2)
-  label=$(echo "$mod_label" | cut -d: -f3)
+import_checks=(
+  "FastAPI app|from app.main import app"
+  "Config module|import app.config"
+  "Database module|import app.database"
+  "number_generator|import app.services.number_generator"
+  "pdf_generator|import app.services.pdf_generator"
+)
 
-  if [ "$attr" = "*" ]; then
-    CMD="import ${mod}"
+for entry in "${import_checks[@]}"; do
+  label="${entry%%|*}"
+  cmd="${entry##*|}"
+  result=$($COMPOSE exec -T backend python3 -c "${cmd}; print('ok')" 2>/dev/null || echo "fail")
+  if echo "$result" | grep -q "ok"; then
+    pass "${label} imports (Docker)"
   else
-    CMD="from ${mod} import ${attr}"
-  fi
-
-  RESULT=$($COMPOSE exec -T backend python3 -c "${CMD}; print('ok')" 2>/dev/null || echo "fail")
-  if echo "$RESULT" | grep -q "ok"; then
-    pass "${label} imports (via Docker)"
-  else
-    fail "${label} import failed (via Docker)"
+    fail "${label} import failed (Docker)"
   fi
 done
 
 echo ""
+fi
 
 # ── 3. Dependencies ───────────────────────────────────
+if should_run "deps"; then
 echo -e "${BOLD}3. Dependencies${RESET}"
 
 cd backend
-if [ -f "requirements.txt" ]; then
+if [[ -f "requirements.txt" ]]; then
   pass "requirements.txt exists"
-  PKG_COUNT=$(grep -cE "^[a-zA-Z]" requirements.txt || echo "0")
-  info "${PKG_COUNT} packages listed"
+  pkg_count=$(grep -cE "^[a-zA-Z]" requirements.txt || echo "0")
+  info "${pkg_count} packages listed"
 else
   fail "requirements.txt missing"
 fi
-cd ..
+cd "$PROJECT_DIR"
 
-# Check Python deps via Docker (single call for speed + reliability)
-MISSING_PKGS=$($COMPOSE exec -T backend python3 -c "
+missing_pkgs=$($COMPOSE exec -T backend python3 -c "
 missing = []
 for pkg in ['fastapi','uvicorn','sqlalchemy','alembic','pydantic','jinja2']:
-    try:
-        __import__(pkg)
-    except ImportError:
-        missing.append(pkg)
-if missing:
-    print(' '.join(missing))
+    try: __import__(pkg)
+    except ImportError: missing.append(pkg)
+if missing: print(' '.join(missing))
 " 2>/dev/null || echo "CHECK_FAILED")
 
-if [ -z "$MISSING_PKGS" ]; then
-  pass "All critical Python packages importable (via Docker)"
-elif [ "$MISSING_PKGS" = "CHECK_FAILED" ]; then
-  warn "Could not verify Python packages (backend container not running?)"
+if [[ -z "$missing_pkgs" ]]; then
+  pass "All critical Python packages importable (Docker)"
+elif [[ "$missing_pkgs" == "CHECK_FAILED" ]]; then
+  warn "Could not verify Python packages (backend container running?)"
 else
-  fail "Missing packages: ${MISSING_PKGS}"
+  fail "Missing packages: ${missing_pkgs}"
 fi
 
 cd frontend
-if [ -d "node_modules" ] && [ -f "node_modules/.package-lock.json" ]; then
+if [[ -d "node_modules" ]] && [[ -f "node_modules/.package-lock.json" ]]; then
   pass "node_modules exists"
-  OUTDATED=$(npm outdated --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d))" 2>/dev/null | tr -d '\n' || echo "0")
-  [ "$OUTDATED" -gt 0 ] 2>/dev/null && info "${OUTDATED} npm packages have updates available"
 else
   fail "node_modules missing — run: cd frontend && npm install"
 fi
-cd ..
+cd "$PROJECT_DIR"
 echo ""
+fi
 
 # ── 4. Frontend ───────────────────────────────────────
+if should_run "frontend"; then
 echo -e "${BOLD}4. Frontend${RESET}"
 
 cd frontend
@@ -142,70 +166,71 @@ cd frontend
 if npx tsc --noEmit 2>/dev/null; then
   pass "TypeScript compiles (no errors)"
 else
-  TSCOUNT=$(npx tsc --noEmit 2>&1 | grep -c "error TS" || echo "0")
-  if [ "$TSCOUNT" -gt 0 ]; then
-    fail "TypeScript: ${TSCOUNT} type errors"
+  ts_count=$(npx tsc --noEmit 2>&1 | grep -c "error TS" || echo "0")
+  if [[ "$ts_count" -gt 0 ]]; then
+    fail "TypeScript: ${ts_count} type errors"
     npx tsc --noEmit 2>&1 | grep "error TS" | head -3 | while read -r line; do info "$line"; done
   else
     warn "TypeScript check inconclusive"
   fi
 fi
 
-LINT_OUTPUT=$(npx eslint src/ 2>&1)
-LINT_EXIT=$?
-if [ $LINT_EXIT -eq 0 ]; then
+lint_output=$(npx eslint src/ 2>&1)
+lint_exit=$?
+if [[ $lint_exit -eq 0 ]]; then
   pass "ESLint passes"
 else
-  LINT_ERRORS=$(echo "$LINT_OUTPUT" | grep -c " error " 2>/dev/null || echo "0")
-  LINT_WARNS=$(echo "$LINT_OUTPUT" | grep -c " warning " 2>/dev/null || echo "0")
-  if [ "${LINT_ERRORS:-0}" -gt 0 ] 2>/dev/null; then
-    warn "ESLint: ${LINT_ERRORS} errors, ${LINT_WARNS} warnings"
-    echo "$LINT_OUTPUT" | grep -E "error|✖" | head -5 | while read -r line; do info "$line"; done
+  lint_errors=$(echo "$lint_output" | grep -c " error " 2>/dev/null || echo "0")
+  lint_warns=$(echo "$lint_output" | grep -c " warning " 2>/dev/null || echo "0")
+  if [[ "${lint_errors:-0}" -gt 0 ]] 2>/dev/null; then
+    warn "ESLint: ${lint_errors} errors, ${lint_warns} warnings"
   else
-    pass "ESLint passes (${LINT_WARNS} warnings)"
+    pass "ESLint passes (${lint_warns} warnings)"
   fi
 fi
 
-PAGE_COUNT=$(find src/pages -name "*.tsx" 2>/dev/null | wc -l | tr -d " ")
-EMPTY_PAGES=0
-for f in $(find src/pages -name "*.tsx" 2>/dev/null); do
-  LINES=$(wc -l < "$f" | tr -d " ")
-  [ "$LINES" -lt 2 ] && EMPTY_PAGES=$((EMPTY_PAGES + 1))
-done
-if [ "$PAGE_COUNT" -gt 0 ]; then
-  if [ $EMPTY_PAGES -eq 0 ]; then
-    pass "All ${PAGE_COUNT} pages have content"
+page_count=$(find src/pages -name "*.tsx" 2>/dev/null | wc -l | tr -d " ")
+empty_pages=0
+while IFS= read -r f; do
+  lines=$(wc -l < "$f" | tr -d " ")
+  [[ "$lines" -lt 2 ]] && empty_pages=$((empty_pages + 1))
+done < <(find src/pages -name "*.tsx" 2>/dev/null)
+
+if [[ "$page_count" -gt 0 ]]; then
+  if [[ $empty_pages -eq 0 ]]; then
+    pass "All ${page_count} pages have content"
   else
-    warn "${EMPTY_PAGES}/${PAGE_COUNT} pages appear empty"
+    warn "${empty_pages}/${page_count} pages appear empty"
   fi
 fi
 
-COMP_COUNT=$(find src/components -name "*.tsx" 2>/dev/null | wc -l | tr -d " ")
-[ "$COMP_COUNT" -gt 0 ] && pass "${COMP_COUNT} components found"
+comp_count=$(find src/components -name "*.tsx" 2>/dev/null | wc -l | tr -d " ")
+[[ "$comp_count" -gt 0 ]] && pass "${comp_count} components found"
 
 echo -e "  ${CYAN}Building frontend...${RESET}"
-BUILD_START=$(date +%s)
+build_start=$(date +%s)
 if npm run build > /tmp/vitebuild.log 2>&1; then
-  BUILD_END=$(date +%s)
-  BUILD_TIME=$((BUILD_END - BUILD_START))
-  pass "Vite production build succeeds (${BUILD_TIME}s)"
+  build_time=$(( $(date +%s) - build_start ))
+  pass "Vite production build succeeds (${build_time}s)"
 else
   fail "Vite production build failed"
   tail -5 /tmp/vitebuild.log | while read -r line; do info "$line"; done
 fi
 
-cd ..
+cd "$PROJECT_DIR"
 echo ""
+fi
 
 # ── 5. Docker ─────────────────────────────────────────
+if should_run "docker"; then
 echo -e "${BOLD}5. Docker${RESET}"
 
-if [ -f "docker-compose.yml" ]; then
+if [[ -f "docker-compose.yml" ]]; then
   pass "docker-compose.yml exists"
   if $COMPOSE config > /dev/null 2>&1; then
     pass "docker-compose.yml is valid"
-    SVC_COUNT=$($COMPOSE config --services 2>/dev/null | wc -l | tr -d " ")
-    info "Services defined: ${SVC_COUNT}"
+    svc_count=$($COMPOSE config --services 2>/dev/null | wc -l | tr -d " ")
+    info "Services defined: ${svc_count}"
     $COMPOSE config --services 2>/dev/null | while read -r svc; do info "  - ${svc}"; done
   else
     fail "docker-compose.yml has errors"
@@ -216,62 +241,81 @@ fi
 
 for svc in db backend; do
   state=$($COMPOSE ps --format '{{.State}}' "$svc" 2>/dev/null || echo "not running")
-  if [ "$state" = "running" ]; then
+  if [[ "$state" == "running" ]]; then
     pass "Container '${svc}' is running"
   else
     warn "Container '${svc}' state: ${state:-not started}"
   fi
 done
 
-[ -f "backend/Dockerfile" ] && pass "Backend Dockerfile exists" || warn "Backend Dockerfile missing"
+[[ -f "backend/Dockerfile" ]] && pass "Backend Dockerfile exists" || warn "Backend Dockerfile missing"
 
 echo ""
+fi
 
 # ── 6. Database ───────────────────────────────────────
+if should_run "db"; then
 echo -e "${BOLD}6. Database${RESET}"
 
 if $COMPOSE exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; then
   pass "PostgreSQL is ready"
 
-  TABLE_COUNT=$($COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -tAc \
+  table_count=$($COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -tAc \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null || echo "0")
-  if [ "$TABLE_COUNT" -gt 0 ] 2>/dev/null; then
-    pass "Database has ${TABLE_COUNT} public tables"
+  if [[ "$table_count" -gt 0 ]] 2>/dev/null; then
+    pass "Database has ${table_count} public tables"
   else
     warn "No public tables — migrations may not have run"
   fi
 
   $COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -tAc \
     "SELECT table_name || ': ' || n_live_tup FROM pg_stat_user_tables ORDER BY table_name;" 2>/dev/null \
-    | while read -r line; do [ -n "$line" ] && info "$line"; done
+    | while read -r line; do [[ -n "$line" ]] && info "$line"; done
 
-  MIGRATION_COUNT=$(find backend/alembic/versions -name "*.py" 2>/dev/null | wc -l | tr -d " ")
-  if [ "$MIGRATION_COUNT" -gt 0 ]; then
-    pass "Alembic migrations exist (${MIGRATION_COUNT} files)"
+  migration_count=$(find backend/alembic/versions -name "*.py" 2>/dev/null | wc -l | tr -d " ")
+  if [[ "$migration_count" -gt 0 ]]; then
+    pass "Alembic migrations exist (${migration_count} files)"
   else
     warn "No migration files found"
   fi
-elif pg_isready -q 2>/dev/null; then
-  pass "PostgreSQL running on host"
 else
   warn "PostgreSQL not reachable"
 fi
 
 echo ""
+fi
+
+# ── 6b. Alembic Migrations ───────────────────────────
+if should_run "alembic"; then
+echo -e "${BOLD}6b. Alembic Migrations${RESET}"
+
+alembic_result=$($COMPOSE exec -T backend alembic upgrade head 2>&1)
+if [[ $? -eq 0 ]]; then
+  pass "Alembic upgrade head succeeds"
+else
+  fail "Alembic upgrade head failed"
+  echo "$alembic_result" | tail -3 | while read -r line; do info "$line"; done
+fi
+
+alembic_current=$($COMPOSE exec -T backend alembic current 2>&1 | grep -oE '[a-f0-9]+ \(head\)' || echo "unknown")
+info "Current migration: ${alembic_current}"
+
+echo ""
+fi
 
 # ── 7. API Integration ────────────────────────────────
+if should_run "api"; then
 echo -e "${BOLD}7. API Integration${RESET}"
 
-# Define check_endpoint BEFORE the if block
 check_endpoint() {
   local label="$1" url="$2" expected="${3:-200}"
   local code
-  if [ -n "${AUTH_HEADER:-}" ]; then
-    code=$(curl -s -o /dev/null -w "%{http_code}" -H "$AUTH_HEADER" --max-time 5 "$url" 2>/dev/null || echo "000")
+  if [[ -n "${AUTH_TOKEN:-}" ]]; then
+    code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${AUTH_TOKEN}" --max-time 5 "$url" 2>/dev/null || echo "000")
   else
     code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" 2>/dev/null || echo "000")
   fi
-  if [ "$code" = "$expected" ]; then
+  if [[ "$code" == "$expected" ]]; then
     pass "${label} (HTTP ${code})"
   else
     fail "${label} (expected ${expected}, got ${code})"
@@ -281,17 +325,13 @@ check_endpoint() {
 if curl -sf "${BACKEND_URL}/docs" > /dev/null 2>&1; then
   pass "Backend API is running"
 
-  # Get auth token
   AUTH_TOKEN=""
-  AUTH_HEADER=""
-  if [ -n "${TEST_EMAIL:-}" ] && [ -n "${TEST_PASSWORD:-}" ]; then
+  if [[ -n "${TEST_EMAIL:-}" ]] && [[ -n "${TEST_PASSWORD:-}" ]]; then
     AUTH_TOKEN=$(curl -sf -X POST "${BACKEND_URL}/api/auth/login" \
       -H "Content-Type: application/json" \
       -d "{\"email\":\"${TEST_EMAIL}\",\"password\":\"${TEST_PASSWORD}\"}" 2>/dev/null \
       | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || echo "")
-    if [ -n "$AUTH_TOKEN" ]; then
-      AUTH_HEADER="Authorization: Bearer ${AUTH_TOKEN}"
-    fi
+    [[ -n "$AUTH_TOKEN" ]] && pass "Authenticated as ${TEST_EMAIL}" || warn "Auth failed — running unauthenticated"
   fi
 
   check_endpoint "GET /api/clients" "${BACKEND_URL}/api/clients"
@@ -302,48 +342,44 @@ if curl -sf "${BACKEND_URL}/docs" > /dev/null 2>&1; then
   check_endpoint "Swagger docs" "${BACKEND_URL}/docs"
   check_endpoint "OpenAPI schema" "${BACKEND_URL}/openapi.json"
 
-  EP_COUNT=$(curl -sf "${BACKEND_URL}/openapi.json" 2>/dev/null | python3 -c "
+  ep_count=$(curl -sf "${BACKEND_URL}/openapi.json" 2>/dev/null | python3 -c "
 import sys, json
 spec = json.load(sys.stdin)
-count = sum(1 for p in spec.get('paths',{}).values() for m in p if m.upper() in ('GET','POST','PUT','PATCH','DELETE'))
-print(count)
+print(sum(1 for p in spec.get('paths',{}).values() for m in p if m.upper() in ('GET','POST','PUT','PATCH','DELETE')))
 " 2>/dev/null || echo "?")
-  info "Total API endpoints: ${EP_COUNT}"
+  info "Total API endpoints: ${ep_count}"
 
-  RESP_TIME=$(curl -sf -o /dev/null -w "%{time_total}" "${BACKEND_URL}/docs" 2>/dev/null || echo "0")
-  RESP_MS=$(python3 -c "print(int(float('${RESP_TIME}') * 1000))" 2>/dev/null || echo "?")
-  if [ "$RESP_MS" != "?" ] && [ "$RESP_MS" -lt 200 ]; then
-    pass "API response time: ${RESP_MS}ms"
-  elif [ "$RESP_MS" != "?" ] && [ "$RESP_MS" -lt 500 ]; then
-    warn "API response time: ${RESP_MS}ms (slow)"
+  resp_time=$(curl -sf -o /dev/null -w "%{time_total}" "${BACKEND_URL}/docs" 2>/dev/null || echo "0")
+  resp_ms=$(python3 -c "print(int(float('${resp_time}') * 1000))" 2>/dev/null || echo "?")
+  if [[ "$resp_ms" != "?" ]] && [[ "$resp_ms" -lt 200 ]]; then
+    pass "API response time: ${resp_ms}ms"
+  elif [[ "$resp_ms" != "?" ]] && [[ "$resp_ms" -lt 500 ]]; then
+    warn "API response time: ${resp_ms}ms (slow)"
   else
-    info "API response time: ${RESP_MS}ms"
+    info "API response time: ${resp_ms}ms"
   fi
 
   echo -e "  ${CYAN}Running CRUD smoke test...${RESET}"
-  if [ -n "${AUTH_HEADER:-}" ]; then
-    CURL_AUTH=(-H "$AUTH_HEADER")
-  else
-    CURL_AUTH=()
-  fi
+  curl_auth=()
+  [[ -n "${AUTH_TOKEN:-}" ]] && curl_auth=(-H "Authorization: Bearer ${AUTH_TOKEN}")
 
-  CLIENT_RESP=$(curl -sf -X POST "${BACKEND_URL}/api/clients" \
-    ${CURL_AUTH+"${CURL_AUTH[@]}"} \
+  client_resp=$(curl -sf -X POST "${BACKEND_URL}/api/clients" \
+    "${curl_auth[@]}" \
     -H "Content-Type: application/json" \
     -d '{"customer_number":"TEST-999","company_name":"__test_client__","street":"Test St 1","postal_code":"8000","city":"Zürich"}' 2>/dev/null || echo "")
 
-  if echo "$CLIENT_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('id')" 2>/dev/null; then
-    CLIENT_ID=$(echo "$CLIENT_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-    pass "POST /api/clients creates client (id: ${CLIENT_ID})"
+  if echo "$client_resp" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('id')" 2>/dev/null; then
+    client_id=$(echo "$client_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+    pass "POST /api/clients creates client (id: ${client_id})"
 
-    GET_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${CURL_AUTH[@]}" "${BACKEND_URL}/api/clients/${CLIENT_ID}" 2>/dev/null || echo "0")
-    [ "$GET_CODE" = "200" ] && pass "GET /api/clients/${CLIENT_ID} returns 200" || fail "GET client returned ${GET_CODE}"
+    get_code=$(curl -s -o /dev/null -w "%{http_code}" "${curl_auth[@]}" "${BACKEND_URL}/api/clients/${client_id}" 2>/dev/null || echo "0")
+    [[ "$get_code" == "200" ]] && pass "GET /api/clients/${client_id} returns 200" || fail "GET client returned ${get_code}"
 
-    DEL_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${CURL_AUTH[@]}" -X DELETE "${BACKEND_URL}/api/clients/${CLIENT_ID}" 2>/dev/null || echo "0")
-    if [ "$DEL_CODE" = "200" ] || [ "$DEL_CODE" = "204" ]; then
-      pass "DELETE /api/clients/${CLIENT_ID} cleanup"
+    del_code=$(curl -s -o /dev/null -w "%{http_code}" "${curl_auth[@]}" -X DELETE "${BACKEND_URL}/api/clients/${client_id}" 2>/dev/null || echo "0")
+    if [[ "$del_code" == "200" ]] || [[ "$del_code" == "204" ]]; then
+      pass "DELETE /api/clients/${client_id} cleanup"
     else
-      warn "DELETE client returned ${DEL_CODE}"
+      warn "DELETE client returned ${del_code}"
     fi
   else
     warn "CRUD smoke test skipped (could not create test client)"
@@ -354,8 +390,10 @@ else
 fi
 
 echo ""
+fi
 
 # ── 8. Frontend Reachability ──────────────────────────
+if should_run "frontend-live"; then
 echo -e "${BOLD}8. Frontend${RESET}"
 
 if curl -sf "${FRONTEND_URL}" > /dev/null 2>&1; then
@@ -365,18 +403,19 @@ else
 fi
 
 echo ""
+fi
 
 # ── 9. Port Conflicts ────────────────────────────────
+if should_run "ports"; then
 echo -e "${BOLD}9. Port Conflicts${RESET}"
 
 for port in 5434 8001 5173; do
   listeners=$(lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -cv "^COMMAND" 2>/dev/null || echo "0")
   listeners="${listeners//[^0-9]/}"
-[ -z "$listeners" ] && listeners=0
-  if [ "$listeners" -gt 1 ]; then
+  [[ -z "$listeners" ]] && listeners=0
+  if [[ "$listeners" -gt 1 ]]; then
     fail "Port ${port} has ${listeners} listeners — conflict!"
-    lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -v "^COMMAND" | head -3 | while read -r line; do info "$line"; done
-  elif [ "$listeners" -eq 1 ]; then
+  elif [[ "$listeners" -eq 1 ]]; then
     pass "Port ${port} has 1 listener"
   else
     info "Port ${port} — no listeners"
@@ -384,80 +423,137 @@ for port in 5434 8001 5173; do
 done
 
 echo ""
+fi
 
 # ── 10. Security ──────────────────────────────────────
+if should_run "security"; then
 echo -e "${BOLD}10. Security${RESET}"
 
-SECRETS_FOUND=$(grep -rn "password\|secret\|api_key" backend/app/ --include="*.py" 2>/dev/null \
+secrets_found=$(grep -rn "password\|secret\|api_key" backend/app/ --include="*.py" 2>/dev/null \
   | grep -v "environ\|getenv\|settings\|pydantic\|password_hash\|hashed_password\|HTTPException\|detail=" \
   | grep -iE '=\s*".{8,}"' || true)
 
-if [ -n "$SECRETS_FOUND" ]; then
+if [[ -n "$secrets_found" ]]; then
   fail "Possible hardcoded secrets in backend"
-  echo "$SECRETS_FOUND" | head -3 | while read -r line; do info "$line"; done
+  echo "$secrets_found" | head -3 | while read -r line; do info "$line"; done
 else
   pass "No hardcoded secrets in Python code"
 fi
 
-if [ -f "docker-compose.yml" ]; then
-  DC_SECRETS=$(grep -E "(PASSWORD|SECRET|KEY)=" docker-compose.yml 2>/dev/null | grep -v '${' || true)
-  if [ -n "$DC_SECRETS" ]; then
+if [[ -f "docker-compose.yml" ]]; then
+  dc_secrets=$(grep -E "(PASSWORD|SECRET|KEY)=" docker-compose.yml 2>/dev/null | grep -v '\${' || true)
+  if [[ -n "$dc_secrets" ]]; then
     warn "Hardcoded secrets in docker-compose.yml"
-    info "Consider using \${VAR} references with .env file"
+    info "Use \${VAR} references with .env file"
   else
     pass "docker-compose.yml uses env variables for secrets"
   fi
 fi
 
-if [ -f ".gitignore" ]; then
-  ALL_IGNORED=true
-  for PATTERN in ".env" "venv" "__pycache__" "node_modules" "uploads"; do
-    if ! grep -q "$PATTERN" .gitignore 2>/dev/null; then
-      warn ".gitignore missing: ${PATTERN}"
-      ALL_IGNORED=false
+if [[ -f ".gitignore" ]]; then
+  all_ignored=true
+  for pattern in ".env" "venv" "__pycache__" "node_modules" "uploads" ".logs"; do
+    if ! grep -q "$pattern" .gitignore 2>/dev/null; then
+      warn ".gitignore missing: ${pattern}"
+      all_ignored=false
     fi
   done
-  $ALL_IGNORED && pass ".gitignore covers sensitive patterns"
+  $all_ignored && pass ".gitignore covers sensitive patterns"
 else
   fail ".gitignore file missing"
 fi
 
-CORS=$(grep -oE "allow_origins=\[.*\]" backend/app/main.py 2>/dev/null || echo "")
-if echo "$CORS" | grep -q '\*'; then
+cors=$(grep -oE "allow_origins=\[.*\]" backend/app/main.py 2>/dev/null || echo "")
+if echo "$cors" | grep -q '\*'; then
   warn "CORS allows all origins (*) — restrict for production"
 else
   pass "CORS configuration looks reasonable"
 fi
 
 echo ""
-
-# ── 11. Production Readiness ─────────────────────────
-echo -e "${BOLD}11. Production Readiness${RESET}"
-
-[ -f "README.md" ] && pass "README.md exists ($(wc -l < README.md | tr -d ' ') lines)" || warn "README.md missing"
-[ -f "SPEC.md" ] && pass "SPEC.md exists" || info "No SPEC.md"
-
-if [ -d "backend/alembic" ]; then
-  pass "Alembic configured"
-else
-  warn "No alembic directory — DB migrations not set up"
 fi
 
-[ -f "backend/app/seed.py" ] && pass "Seed data script exists"
+# ── 11. Production Readiness ─────────────────────────
+if should_run "prod"; then
+echo -e "${BOLD}11. Production Readiness${RESET}"
 
-UPLOAD_DIR="backend/uploads"
-[ -d "$UPLOAD_DIR" ] && pass "Uploads directory exists" || warn "Uploads directory missing"
+[[ -f "README.md" ]] && pass "README.md exists ($(wc -l < README.md | tr -d ' ') lines)" || warn "README.md missing"
+[[ -f "SPEC.md" ]] && pass "SPEC.md exists" || info "No SPEC.md"
+[[ -d "backend/alembic" ]] && pass "Alembic configured" || warn "No alembic directory"
+[[ -f "backend/app/seed.py" ]] && pass "Seed data script exists"
+[[ -d "backend/uploads" ]] && pass "Uploads directory exists" || warn "Uploads directory missing"
 
 echo ""
+fi
+
+# ── 12. Type-Safe API Client ─────────────────────────
+if should_run "types"; then
+echo -e "${BOLD}12. Type-Safe API Client${RESET}"
+
+cd frontend
+if [[ -f "src/types/api.generated.ts" ]]; then
+  lines=$(wc -l < src/types/api.generated.ts | tr -d " ")
+  if [[ "$lines" -gt 10 ]]; then
+    pass "Generated API types exist (${lines} lines)"
+  else
+    warn "api.generated.ts exists but looks empty (${lines} lines)"
+  fi
+
+  if command -v npx &> /dev/null && curl -sf "${BACKEND_URL}/openapi.json" > /dev/null 2>&1; then
+    npx openapi-typescript "${BACKEND_URL}/openapi.json" -o /tmp/api-check.ts 2>/dev/null
+    if [[ -f "/tmp/api-check.ts" ]]; then
+      if diff -q src/types/api.generated.ts /tmp/api-check.ts > /dev/null 2>&1; then
+        pass "API types are up to date"
+      else
+        warn "API types are stale — run: npm run generate-api"
+      fi
+      rm -f /tmp/api-check.ts
+    fi
+  fi
+else
+  warn "No generated API types — run: npm run generate-api"
+fi
+cd "$PROJECT_DIR"
+echo ""
+fi
+
+# ── 13. E2E Tests ────────────────────────────────────
+if should_run "e2e"; then
+echo -e "${BOLD}13. E2E Tests${RESET}"
+
+cd frontend
+if [[ -d "e2e" ]] && [[ -f "playwright.config.ts" ]]; then
+  e2e_count=$(find e2e -name "*.spec.ts" 2>/dev/null | wc -l | tr -d " ")
+  pass "Playwright configured (${e2e_count} spec files)"
+
+  if [[ "${RUN_E2E:-false}" == "true" ]]; then
+    echo -e "  ${CYAN}Running E2E tests...${RESET}"
+    e2e_output=$(npx playwright test --reporter=line 2>&1)
+    if [[ $? -eq 0 ]]; then
+      e2e_passed=$(echo "$e2e_output" | grep -oE "[0-9]+ passed" || echo "? passed")
+      pass "E2E tests passed (${e2e_passed})"
+    else
+      e2e_failed=$(echo "$e2e_output" | grep -oE "[0-9]+ failed" || echo "? failed")
+      fail "E2E tests failed (${e2e_failed})"
+    fi
+  else
+    info "Skipped — set RUN_E2E=true to run"
+  fi
+else
+  info "No Playwright tests configured"
+fi
+cd "$PROJECT_DIR"
+echo ""
+fi
 
 # ── Summary ───────────────────────────────────────────
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "  ${GREEN}✓ ${PASSED} passed${RESET}  ${RED}✗ ${ERRORS} failed${RESET}  ${YELLOW}⊘ ${WARNINGS} warnings${RESET}"
 echo ""
-if [ $ERRORS -eq 0 ]; then
+if [[ $ERRORS -eq 0 ]]; then
   echo -e "${GREEN}${BOLD}✓ All checks passed — ready to deploy!${RESET}"
 else
   echo -e "${RED}${BOLD}✗ ${ERRORS} check(s) failed — fix before deploying${RESET}"
 fi
 echo ""
-exit $ERRORS
+exit "$ERRORS"

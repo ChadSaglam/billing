@@ -30,3 +30,5 @@ pgdata/
 uploads
 
 structure.txt
+
+.logs/

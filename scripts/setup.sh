@@ -4,7 +4,15 @@
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
+
 CYAN="\033[36m"; GREEN="\033[32m"; YELLOW="\033[33m"; RED="\033[31m"; RESET="\033[0m"; BOLD="\033[1m"
+
+log_ok()    { echo -e "  ${GREEN}✓${RESET} $1"; }
+log_warn()  { echo -e "  ${YELLOW}⊘${RESET} $1"; }
+log_error() { echo -e "  ${RED}✗${RESET} $1"; }
 
 echo -e "${BOLD}🧾 chadev-billing — Setup${RESET}"
 echo ""
@@ -12,73 +20,85 @@ echo ""
 # ── Prerequisites ──────────────────────────────────────
 echo -e "${BOLD}Checking prerequisites...${RESET}"
 
-check() {
-  if command -v "$1" &> /dev/null; then
-    echo -e "  ${GREEN}✓${RESET} $1 $($1 --version 2>/dev/null | head -1)"
+require() {
+  local cmd="$1" install_hint="$2"
+  if command -v "$cmd" &> /dev/null; then
+    log_ok "$cmd $(command "$cmd" --version 2>/dev/null | head -1)"
   else
-    echo -e "  ${RED}✗${RESET} $1 not found"
-    return 1
+    log_error "$cmd not found — $install_hint"
+    exit 1
   fi
 }
 
-check docker || { echo "Install Docker: https://docker.com"; exit 1; }
-check node || { echo "Install Node.js 20+: https://nodejs.org"; exit 1; }
-check npm || exit 1
+require docker "https://docker.com"
+require node "https://nodejs.org (v20+)"
+require npm "installed with Node.js"
+echo ""
+
+# ── .env ───────────────────────────────────────────────
+echo -e "${BOLD}Environment...${RESET}"
+if [[ ! -f ".env" ]]; then
+  if [[ -f ".env.example" ]]; then
+    cp .env.example .env
+    log_warn ".env created from .env.example — review and fill in secrets"
+  else
+    log_error "No .env or .env.example found"
+    exit 1
+  fi
+else
+  log_ok ".env exists"
+fi
 echo ""
 
 # ── Backend ────────────────────────────────────────────
 echo -e "${BOLD}Setting up backend...${RESET}"
 cd backend
 
-if [ ! -d "venv" ]; then
+if [[ ! -d "venv" ]]; then
   if command -v python3 &> /dev/null; then
     python3 -m venv venv
-    echo -e "  ${GREEN}✓${RESET} Virtual environment created"
+    log_ok "Virtual environment created"
   else
-    echo -e "  ${YELLOW}⊘${RESET} No local python3 — will use Docker only"
+    log_warn "No local python3 — will use Docker only"
   fi
 fi
 
-if [ -d "venv" ]; then
+if [[ -d "venv" ]]; then
   source venv/bin/activate
   pip install -q -r requirements.txt 2>/dev/null || {
-    echo -e "  ${YELLOW}⊘${RESET} Some pip packages failed (OK — backend runs in Docker with Python 3.12)"
+    log_warn "Some pip packages failed (OK — backend runs in Docker with Python 3.12)"
   }
 fi
 
-if [ ! -d "uploads" ]; then
-  mkdir -p uploads
-  echo -e "  ${GREEN}✓${RESET} uploads directory created"
-fi
+mkdir -p uploads
+log_ok "uploads directory ready"
 
-cd ..
+cd "$PROJECT_DIR"
+echo ""
 
 # ── Frontend ───────────────────────────────────────────
 echo -e "${BOLD}Setting up frontend...${RESET}"
 cd frontend
 npm install --silent
-echo -e "  ${GREEN}✓${RESET} Node dependencies installed"
-cd ..
+log_ok "Node dependencies installed"
+cd "$PROJECT_DIR"
+echo ""
 
 # ── Docker ─────────────────────────────────────────────
-echo ""
 echo -e "${BOLD}Building Docker images...${RESET}"
 docker compose build
-echo -e "  ${GREEN}✓${RESET} Docker images built"
+log_ok "Docker images built"
+echo ""
 
 # ── Port Check ─────────────────────────────────────────
-echo ""
 echo -e "${BOLD}Checking ports...${RESET}"
 for port in 5434 8001 5173; do
   if lsof -i :"$port" -sTCP:LISTEN > /dev/null 2>&1; then
-    PROC=$(lsof -i :"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
-    PNAME=$(ps -p "$PROC" -o comm= 2>/dev/null || echo "unknown")
-    echo -e "  ${YELLOW}⊘${RESET} Port ${port} in use by ${PNAME} (PID ${PROC})"
-    if [ "$port" = "5434" ]; then
-      echo -e "    ${CYAN}Tip: Remove 'ports' from db service in docker-compose.yml if not needed${RESET}"
-    fi
+    proc_pid=$(lsof -i :"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    proc_name=$(ps -p "$proc_pid" -o comm= 2>/dev/null || echo "unknown")
+    log_warn "Port $port in use by $proc_name (PID $proc_pid)"
   else
-    echo -e "  ${GREEN}✓${RESET} Port ${port} available"
+    log_ok "Port $port available"
   fi
 done
 
@@ -86,8 +106,8 @@ echo ""
 echo -e "${GREEN}${BOLD}✓ Setup complete!${RESET}"
 echo ""
 echo "Start services:"
-echo "  ./scripts/dev.sh          # development mode"
+echo "  ./scripts/dev.sh"
 echo ""
-echo "Verify & In another terminal:"
-echo "  ./scripts/test.sh              # run all checks"
+echo "Verify (in another terminal):"
+echo "  ./scripts/test.sh"
 echo "  ./scripts/project-overview.sh"

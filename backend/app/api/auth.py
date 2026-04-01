@@ -1,14 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.auth import (
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
 from app.database import get_db
 from app.models.settings import CompanySettings
 from app.models.tenant import Tenant
 from app.models.user import User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 class RegisterRequest(BaseModel):
@@ -23,8 +33,13 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
 
 
@@ -40,7 +55,8 @@ class UserResponse(BaseModel):
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-def register(data: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, data: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -62,25 +78,40 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
 
-    # Auto-create company settings for new tenant
-    company_settings = CompanySettings(
-        tenant_id=tenant.id,
-        company_name=data.company_name,
-    )
-    db.add(company_settings)
+    db.add(CompanySettings(tenant_id=tenant.id, company_name=data.company_name))
     db.commit()
 
-    return TokenResponse(access_token=create_access_token(user.id, tenant.id))
+    return TokenResponse(
+        access_token=create_access_token(user.id, tenant.id),
+        refresh_token=create_refresh_token(user.id, tenant.id),
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
-    return TokenResponse(access_token=create_access_token(user.id, user.tenant_id))
+    return TokenResponse(
+        access_token=create_access_token(user.id, user.tenant_id),
+        refresh_token=create_refresh_token(user.id, user.tenant_id),
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
+    payload = decode_refresh_token(data.refresh_token)
+    user_id = int(payload["sub"])
+    user = db.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or disabled")
+    return TokenResponse(
+        access_token=create_access_token(user.id, user.tenant_id),
+        refresh_token=create_refresh_token(user.id, user.tenant_id),
+    )
 
 
 @router.get("/me", response_model=UserResponse)
@@ -93,4 +124,3 @@ def get_me(user: User = Depends(get_current_user)):
         tenant_id=user.tenant_id,
         tenant_name=user.tenant.name,
     )
-
