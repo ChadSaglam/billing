@@ -1,10 +1,12 @@
 import os
+from pathlib import Path
 from contextlib import asynccontextmanager
+
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -12,20 +14,24 @@ from slowapi.util import get_remote_address
 
 from app.api import auth, clients, dashboard, documents, services, settings, users
 from app.api import portal
-from app.config import settings as app_settings
-from app.database import Base, engine, get_db, SessionLocal
-from sqlalchemy.orm import Session
 from app.auth import get_current_user
+from app.config import settings as app_settings
+from app.database import Base, SessionLocal, engine, get_db
 from app.models.user import User
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOADS_DIR = BASE_DIR / "uploads"
+LOGOS_DIR = UPLOADS_DIR / "logos"
 
 limiter = Limiter(key_func=get_remote_address)
 
-
 async def _background_jobs():
     import asyncio
+
     while True:
         try:
             db = SessionLocal()
+
             from app.services.overdue_checker import mark_overdue_invoices
             count = mark_overdue_invoices(db)
             if count:
@@ -39,29 +45,32 @@ async def _background_jobs():
             db.close()
         except Exception as e:
             print(f"[background] Error: {e}")
-        await asyncio.sleep(3600)
 
+        await asyncio.sleep(3600)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
+
     try:
         from app.services.overdue_checker import mark_overdue_invoices
         count = mark_overdue_invoices(db)
         if count:
             print(f"[startup] Marked {count} invoices as overdue")
+
         from app.services.recurring_invoices import process_recurring_invoices
         created = process_recurring_invoices(db)
         if created:
             print(f"[startup] Created {created} recurring invoices")
     finally:
         db.close()
+
     task = asyncio.create_task(_background_jobs())
     yield
     task.cancel()
-
 
 app = FastAPI(
     title="ChaDev Billing API",
@@ -90,13 +99,13 @@ app.include_router(services.router)
 app.include_router(portal.router)
 app.include_router(users.router)
 
-os.makedirs("/app/uploads/logos", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="/app/uploads"), name="uploads")
-
+LOGOS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 @app.get("/api/health")
 def health(db: Session = Depends(get_db)):
     import shutil
+
     health = {"status": "ok"}
 
     try:
@@ -107,7 +116,7 @@ def health(db: Session = Depends(get_db)):
         health["status"] = "degraded"
 
     try:
-        usage = shutil.disk_usage("/app/uploads")
+        usage = shutil.disk_usage(str(UPLOADS_DIR))
         health["disk"] = {
             "total_gb": round(usage.total / (1024**3), 2),
             "free_gb": round(usage.free / (1024**3), 2),
@@ -125,9 +134,9 @@ def health(db: Session = Depends(get_db)):
 
     return health
 
-
 @app.post("/api/seed")
 def seed_data(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     from app.seed import run_seed
+
     result = run_seed(db, user.tenant_id)
     return {"message": "Seed data created", **result}

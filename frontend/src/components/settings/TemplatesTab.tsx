@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+const API = import.meta.env.VITE_API_URL;
 
 const templates = [
   {

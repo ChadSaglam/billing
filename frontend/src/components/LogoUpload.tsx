@@ -53,7 +53,7 @@ export function LogoUpload({ value, onChange }: LogoUploadProps) {
       toast({ title: 'Failed to upload logo', variant: 'destructive' });
     });
 
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+    const baseUrl = import.meta.env.VITE_API_URL;
     xhr.open('POST', `${baseUrl}/api/settings/logo`);
     const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -73,7 +73,7 @@ export function LogoUpload({ value, onChange }: LogoUploadProps) {
 
   const logoSrc = value
     ? value.startsWith('/')
-      ? `${import.meta.env.VITE_API_URL || 'http://localhost:8001'}${value}`
+      ? `${import.meta.env.VITE_API_URL}${value}`
       : value
     : null;
 

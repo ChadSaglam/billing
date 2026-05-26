@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { downloadDocumentPdf } from "@/lib/api";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8001";
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface PreviewPanelProps {
   documentId: number;

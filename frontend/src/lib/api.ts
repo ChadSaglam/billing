@@ -12,7 +12,7 @@ import type {
 import { getToken, getRefreshToken, setToken, setRefreshToken, clearTokens } from '@/lib/auth';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
+  baseURL: import.meta.env.VITE_API_URL,
 });
 
 api.interceptors.request.use((config) => {
@@ -51,7 +51,7 @@ api.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:8001'}/api/auth/refresh`,
+          `${import.meta.env.VITE_API_URL}/api/auth/refresh`,
           { refresh_token: refreshToken }
         );
         setToken(data.access_token);

@@ -58,63 +58,86 @@ curl -X POST http://localhost:8001/api/seed
 > **Note:** Services (16 templates) are auto-seeded on startup. The `/api/seed` endpoint creates sample clients and invoices.
 
 ---
+## Quick Start (Local)
 
-## Development without Docker
-
-### 1. Database
-
-Start PostgreSQL locally (or via Docker):
+From the project root:
 
 ```bash
-# Option A: Docker for just PostgreSQL
-docker run -d --name chadev-db \
-  -e POSTGRES_USER=chadev \
-  -e POSTGRES_PASSWORD=chadev \
-  -e POSTGRES_DB=chadev_billing \
-  -p 5432:5432 \
-  postgres:16
-
-# Option B: Use your local PostgreSQL
-createdb -U chadev chadev_billing
+./scripts/local-dev.sh
 ```
 
-### 2. Backend
+This starts:
+- PostgreSQL connectivity checks
+- FastAPI backend
+- Vite frontend
+
+Open:
+
+| Service     | URL |
+|-------------|-----|
+| Frontend    | http://localhost:5173 |
+| Backend API | http://localhost:8002 |
+| API Docs    | http://localhost:8002/docs |
+
+Run the smoke tests in another terminal:
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+BACKEND_PORT=8002 ./scripts/local-test.sh
+```
+---
+## Seed sample data
 
-# Set the database URL
-export DATABASE_URL=postgresql://chadev:chadev@db:5432/chadev_billing
+The seed endpoint requires authentication. First register or log in, then call `/api/seed` with a bearer token.
 
-# Run the server (auto-creates tables on startup)
-uvicorn app.main:app --reload --port 8001
+### Register a local user
 
+```bash
+curl -X POST http://localhost:8002/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"***REMOVED***","password":"***REMOVED***","full_name":"Chad Saglam","company_name":"ChaDev"}'
+```
 
-# Step 1: Get token (you already registered)
-TOKEN=$(curl -sf -X POST http://localhost:8001/api/auth/login \
+### Log in
+
+```bash
+TOKEN=$(curl -sf -X POST http://localhost:8002/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"***REMOVED***","password":"***REMOVED***"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
-# Step 2: Run seed
-curl -X POST http://localhost:8001/api/seed \
-  -H "Authorization: Bearer $TOKEN"
 ```
 
-### 3. Frontend
+### Run seed
 
 ```bash
-cd frontend
-npm install
-npm run dev
+curl -X POST http://localhost:8002/api/seed \
+  -H "Authorization: Bearer $TOKEN"
+```
+---
+
+## Development without Docker
+
+### Prerequisites
+
+- Python 3.13
+- Node.js + npm
+- PostgreSQL running locally on `localhost:5432`
+- A project `.env` file at the repo root
+
+### Start everything
+
+```bash
+./scripts/local-dev.sh
 ```
 
-Frontend runs at http://localhost:5173, backend at http://localhost:8001.
+### Run checks
 
----
+```bash
+BACKEND_PORT=8002 ./scripts/local-test.sh
+```
+
+### Stop everything
+
+Press `Ctrl+C` in the terminal running `local-dev.sh`.
 
 ## Project Structure
 

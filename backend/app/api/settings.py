@@ -1,6 +1,6 @@
 import os
 import uuid
-
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,8 @@ from app.schemas.settings import SettingsRead, SettingsUpdate
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-UPLOAD_DIR = "/app/uploads/logos"
+BASE_DIR = Path(__file__).resolve().parent.parent.parent 
+UPLOAD_DIR = BASE_DIR / "uploads" / "logos"
 
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
     settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
