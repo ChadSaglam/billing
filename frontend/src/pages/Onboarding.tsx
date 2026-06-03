@@ -79,7 +79,8 @@ export default function Onboarding() {
   const finishMutation = useMutation({
     mutationFn: completeOnboarding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['settings'] });
+      // refetchQueries waits for the fresh data — onboarding_completed will be true
+      await queryClient.refetchQueries({ queryKey: ['settings'] });
       navigate('/', { replace: true });
     },
   });

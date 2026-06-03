@@ -23,14 +23,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading, isFetching } = useQuery({
     queryKey: ['settings'],
     queryFn: getSettings,
     enabled: isAuthenticated(),
     retry: false,
   });
 
-  if (isLoading) return null;
+  if (isLoading || isFetching) return null;
 
   if (settings && !(settings as CompanySettings & { onboarding_completed?: boolean }).onboarding_completed) {
     return <Navigate to="/onboarding" replace />;
