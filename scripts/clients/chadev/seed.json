@@ -1,0 +1,105 @@
+{
+  "tenant": {
+    "company_name": "ChaDev",
+    "street": "Hohlstrasse 485A",
+    "postal_code": "8048",
+    "city": "Zürich",
+    "country": "Schweiz",
+    "uid": "",
+    "email": "info@chadev.ch",
+    "phone": "+41788815058",
+    "website": "www.chadev.ch"
+  },
+  "bank_details": {
+    "bank_name": "Migros Bank AG",
+    "iban": "***REMOVED***",
+    "bic_swift": "MIGRCHZZXXX"
+  },
+  "defaults": {
+    "default_hourly_rate": 250.00,
+    "default_payment_terms_days": 30,
+    "next_invoice_number": 1326,
+    "next_offerte_number": 2001
+  },
+  "templates": {
+    "active_pdf_template": "modern"
+  },
+  "admin": {
+    "email": "info@chadev.ch",
+    "password": "Sahra/2202",
+    "full_name": "Chad Saglam"
+  },
+  "services": [
+    {"name":"Web Development","category":"Development","unit":"Stunde","default_price":250.00,"description":"Custom website development","is_active":true,"sort_order":1},
+    {"name":"App Development","category":"Development","unit":"Stunde","default_price":250.00,"description":"Mobile application development","is_active":true,"sort_order":2},
+    {"name":"Software Development","category":"Development","unit":"Stunde","default_price":250.00,"description":"Custom software and business application development","is_active":true,"sort_order":3},
+    {"name":"E-Commerce Development","category":"Development","unit":"Stunde","default_price":250.00,"description":"Online store development with payment integration","is_active":true,"sort_order":4},
+    {"name":"Web Design","category":"Development","unit":"Stunde","default_price":250.00,"description":"UI/UX design and visual branding for web","is_active":true,"sort_order":5},
+    {"name":"IT Consulting","category":"Consulting","unit":"Stunde","default_price":250.00,"description":"Strategic IT guidance","is_active":true,"sort_order":1},
+    {"name":"Technical Support","category":"Consulting","unit":"Stunde","default_price":250.00,"description":"Ongoing technical customer support","is_active":true,"sort_order":2},
+    {"name":"System Update","category":"Consulting","unit":"Stunde","default_price":250.00,"description":"Software and system updates and maintenance","is_active":true,"sort_order":3},
+    {"name":"Data Analysis & Visualization","category":"Data & AI","unit":"Stunde","default_price":250.00,"description":"Data analysis, trend identification and dashboard creation","is_active":true,"sort_order":1},
+    {"name":"AI Services","category":"Data & AI","unit":"Stunde","default_price":250.00,"description":"AI integration, machine learning solutions and automation","is_active":true,"sort_order":2},
+    {"name":"ERP Systems","category":"Infrastructure","unit":"Stunde","default_price":250.00,"description":"ERP configuration and business process automation","is_active":true,"sort_order":1},
+    {"name":"Web Hosting","category":"Infrastructure","unit":"Monat","default_price":50.00,"description":"Reliable web hosting with technical support","is_active":true,"sort_order":2},
+    {"name":"Mobile Device Management","category":"Infrastructure","unit":"Stunde","default_price":250.00,"description":"MDM setup, security policies and device management","is_active":true,"sort_order":3},
+    {"name":"Hardware Systems","category":"Infrastructure","unit":"Stück","default_price":500.00,"description":"Hardware solutions for data processing and expansion","is_active":true,"sort_order":4},
+    {"name":"Security Cameras","category":"Infrastructure","unit":"Stück","default_price":350.00,"description":"HD security camera installation and configuration","is_active":true,"sort_order":5},
+    {"name":"Website (Pauschal)","category":"Fixed Price","unit":"Pauschal","default_price":500.00,"description":"Complete website package","is_active":true,"sort_order":1}
+  ],
+  "clients": [
+    {"customer_number":"90014","company_name":"Ammann + Schmid AG","street":"Freiestrasse 39","postal_code":"8610","city":"Uster","country":"Schweiz","email":null},
+    {"customer_number":"90012","company_name":"RDS Isolierungen GmbH","street":"Grüzefeldstrasse 51","postal_code":"8404","city":"Winterthur","country":"Schweiz","email":null},
+    {"customer_number":"90025","company_name":"Sky - Net Logistik GmbH","street":"Bösch 21","postal_code":"6331","city":"Hünenberg","country":"Schweiz","email":"info@sky-net-logistik.ch"}
+  ],
+  "documents": [
+    {
+      "document_type": "rechnung",
+      "document_number": "1011",
+      "client_customer_number": "90014",
+      "date": "2023-12-15",
+      "due_date_days": 30,
+      "status": "paid",
+      "currency": "CHF",
+      "discount_percent": 0,
+      "line_items": [
+        {"position":1,"description":"Erstellt Kontaktseite einige Details Teil","quantity":1,"unit_price":250.00,"unit":"Stunde","total_price":250.00},
+        {"position":2,"description":"Stilisierung der Kontaktseite / Styling Öffnungszeiten Details in header- und Footer","quantity":1,"unit_price":250.00,"unit":"Stunde","total_price":250.00},
+        {"position":3,"description":"Responsive Probleme beendet","quantity":3,"unit_price":250.00,"unit":"Stunde","total_price":750.00},
+        {"position":4,"description":"404 Seite erstellt","quantity":1,"unit_price":250.00,"unit":"Stunde","total_price":250.00}
+      ]
+    },
+    {
+      "document_type": "rechnung",
+      "document_number": "1012",
+      "client_customer_number": "90012",
+      "date": "2023-12-15",
+      "due_date_days": 30,
+      "status": "paid",
+      "currency": "CHF",
+      "discount_percent": 0,
+      "line_items": [
+        {"position":1,"description":"Webseiten","quantity":1,"unit_price":500.00,"unit":"Stück","total_price":500.00},
+        {"position":2,"description":"Beratungsgebühr (Stunde)","quantity":1,"unit_price":250.00,"unit":"Stunde","total_price":250.00},
+        {"position":3,"description":"System Aktualisierung (Stunde)","quantity":2,"unit_price":250.00,"unit":"Stunde","total_price":500.00}
+      ]
+    },
+    {
+      "document_type": "rechnung",
+      "document_number": "1325",
+      "client_customer_number": "90025",
+      "date": "2025-06-29",
+      "due_date_days": 10,
+      "status": "sent",
+      "currency": "CHF",
+      "discount_percent": 13,
+      "discount_amount": 455.00,
+      "subtotal": 3500.00,
+      "total": 3045.00,
+      "line_items": [
+        {"position":1,"description":"Technischer Kundendienst(*Stunde)","quantity":10,"unit_price":250.00,"unit":"Stunde","total_price":2500.00},
+        {"position":2,"description":"Beratungsgebühr(*Stunde)","quantity":4,"unit_price":250.00,"unit":"Stunde","total_price":1000.00}
+      ]
+    }
+  ]
+}

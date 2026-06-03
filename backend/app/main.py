@@ -100,7 +100,7 @@ app.include_router(portal.router)
 app.include_router(users.router)
 
 LOGOS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/api/health")
 def health(db: Session = Depends(get_db)):

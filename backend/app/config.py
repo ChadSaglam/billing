@@ -1,10 +1,12 @@
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
-ENV_FILE = ROOT_DIR / ".env"
+# Provision scripts can override which .env file is loaded
+ENV_FILE = Path(os.environ.get("ENV_FILE", str(ROOT_DIR / ".env")))
 
 
 class Settings(BaseSettings):
