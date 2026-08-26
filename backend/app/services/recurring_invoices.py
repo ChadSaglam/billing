@@ -1,11 +1,11 @@
 import datetime as dt
+
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.document import Document
 from app.models.line_item import LineItem
 from app.services.number_generator import generate_document_number
-
 
 DELTAS = {
     "monthly": relativedelta(months=1),

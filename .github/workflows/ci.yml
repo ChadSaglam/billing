@@ -1,0 +1,222 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+
+jobs:
+  # ── 1. Nothing secret may enter the repo ──────────────────
+  secrets-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse a committed .env
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked by git. Remove it and rotate every value in it."
+            exit 1
+          fi
+
+      - name: Scan for credential-shaped strings
+        run: |
+          set +e
+          PATTERN='(password|passwd|secret_key|api[_-]?key|token)["'"'"']?\s*[:=]\s*["'"'"'][^"'"'"'$\{][^"'"'"']{6,}'
+          HITS=$(git grep -InE "$PATTERN" -- \
+            ':!*.lock' ':!package-lock.json' ':!*.example' ':!.github/workflows/*' \
+            ':!backend/tests/*' ':!scripts/scrub-git-history.sh')
+          if [ -n "$HITS" ]; then
+            echo "::error::Possible hardcoded credential:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "No hardcoded credentials found."
+
+  # ── 2. Backend ────────────────────────────────────────────
+  backend:
+    name: Backend (lint + tests)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: billing
+          POSTGRES_PASSWORD: billing
+          POSTGRES_DB: billing_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U billing -d billing_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql://billing:billing@localhost:5432/billing_test
+      SECRET_KEY: ci-secret-key-that-is-long-enough-to-pass-validation
+      APP_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: System deps for WeasyPrint
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0
+
+      - name: Install
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        working-directory: backend
+        run: ruff check .
+
+      - name: Format check
+        working-directory: backend
+        run: ruff format --check . || echo "::warning::ruff format would change files"
+
+      - name: Tests
+        working-directory: backend
+        run: pytest --cov=app --cov-report=term-missing
+
+      - name: Migrations apply cleanly from empty
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://billing:billing@localhost:5432/billing_migrate
+        run: |
+          PGPASSWORD=billing psql -h localhost -U billing -d postgres -c "CREATE DATABASE billing_migrate;"
+          alembic upgrade head
+          alembic downgrade -1
+          alembic upgrade head
+
+  # ── 3. Frontend ───────────────────────────────────────────
+  frontend:
+    name: Frontend (lint + typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc -b --noEmit
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # ── 4. API types must match the backend ───────────────────
+  api-contract:
+    name: Generated API types are current
+    runs-on: ubuntu-latest
+    needs: [backend]
+    env:
+      DATABASE_URL: postgresql://billing:billing@localhost:5432/billing
+      SECRET_KEY: ci-secret-key-that-is-long-enough-to-pass-validation
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: System deps for WeasyPrint
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0
+
+      - name: Install backend
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Dump OpenAPI schema
+        working-directory: backend
+        run: |
+          python -c "
+          import json
+          from app.main import app
+          json.dump(app.openapi(), open('/tmp/openapi.json', 'w'))
+          "
+
+      - name: Regenerate types and diff
+        working-directory: frontend
+        run: |
+          npx --yes openapi-typescript /tmp/openapi.json -o /tmp/api.generated.ts
+          if ! diff -q /tmp/api.generated.ts src/types/api.generated.ts >/dev/null; then
+            echo "::error::src/types/api.generated.ts is stale. Run: npm run generate-api"
+            diff -u src/types/api.generated.ts /tmp/api.generated.ts | head -60
+            exit 1
+          fi
+          echo "API types are current."
+
+  # ── 5. The stack actually builds and boots ────────────────
+  docker:
+    name: Docker stack boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env for the build
+        run: |
+          cp .env.example .env
+          sed -i "s|^SECRET_KEY=$|SECRET_KEY=$(openssl rand -hex 32)|" .env
+          sed -i "s|^POSTGRES_PASSWORD=$|POSTGRES_PASSWORD=ci-password|" .env
+          sed -i "s|CHANGE_ME|ci-password|" .env
+          sed -i "s|localhost:9202|db:5432|" .env
+
+      - name: Build and start
+        run: docker compose up -d --build db backend
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9201/api/health | grep -q '"status"'; then
+              curl -s http://localhost:9201/api/health
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Backend never became healthy"
+          docker compose logs backend
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

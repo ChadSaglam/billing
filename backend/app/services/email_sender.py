@@ -1,8 +1,8 @@
+import logging
 import smtplib
 import ssl
-import logging
-from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from app.config import settings
@@ -81,7 +81,7 @@ def send_document_email(
 
     portal_section = ""
     if document.portal_token:
-        portal_url = f"{settings.FRONTEND_URL or 'http://localhost:5173'}/portal/{document.portal_token}"
+        portal_url = f"{settings.FRONTEND_URL or 'http://localhost:9200'}/portal/{document.portal_token}"
         portal_section = f'<p>Sie können das Dokument auch online einsehen:</p><p><a class="btn" href="{portal_url}">Dokument online ansehen</a></p>'
 
     contact_parts = []

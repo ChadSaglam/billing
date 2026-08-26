@@ -2,13 +2,11 @@ import io
 from decimal import Decimal
 
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
-from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Spacer, Paragraph, PageBreak, Image
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.models.document import Document
 from app.models.settings import CompanySettings
@@ -82,7 +80,7 @@ def _build_styles():
             leading=9, textColor=MUTED, spaceAfter=1 * mm,
         ),
     }
-    for name, style in custom.items():
+    for _name, style in custom.items():
         styles.add(style)
     return styles
 
@@ -138,7 +136,7 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
         ("Kunden-Nr.:", client.customer_number),
         ("UID:", settings.uid),
     ]
-    meta_html = "".join(f"<b>{l}</b> {v}<br/>" for l, v in meta_rows)
+    meta_html = "".join(f"<b>{label}</b> {v}<br/>" for label, v in meta_rows)
 
     addr_meta = Table(
         [[Paragraph(client_block, styles["Addr"]), Paragraph(meta_html, styles["Meta"])]],
@@ -457,9 +455,8 @@ def generate_invoice_pdf(document: Document, settings: CompanySettings) -> io.By
 def _add_qr_bill_page(elements, document, settings, styles):
     """Swiss QR payment slip per SIX Group spec v2.3."""
     import qrcode
-    from qrcode.image.pil import PilImage
-    from PIL import Image as PILImage
-    from app.services.qr_reference import generate_creditor_reference, format_creditor_reference, validate_qr_iban
+
+    from app.services.qr_reference import format_creditor_reference
 
     iban_clean = settings.iban.replace(" ", "").upper()
     creditor_name = settings.company_name[:70]

@@ -1,6 +1,5 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -20,13 +19,13 @@ class ServiceTemplateCreate(ServiceTemplateBase):
 
 
 class ServiceTemplateUpdate(BaseModel):
-    name: Optional[str] = None
-    category: Optional[str] = None
-    description: Optional[str] = None
-    unit: Optional[str] = None
-    default_price: Optional[Decimal] = None
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
+    name: str | None = None
+    category: str | None = None
+    description: str | None = None
+    unit: str | None = None
+    default_price: Decimal | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
 
 
 class ServiceTemplateRead(ServiceTemplateBase):

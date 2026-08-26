@@ -1,5 +1,7 @@
 from decimal import Decimal
+
 from pydantic import BaseModel
+
 
 class SettingsBase(BaseModel):
     company_name: str

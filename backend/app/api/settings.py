@@ -1,7 +1,8 @@
 import os
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth import get_tenant_id
@@ -11,37 +12,64 @@ from app.schemas.settings import SettingsRead, SettingsUpdate
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 UPLOAD_DIR = BASE_DIR / "uploads" / "logos"
 
-def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
-    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
-    if not settings:
-        raise HTTPException(status_code=404, detail="Settings not found")
-    return settings
 
-@router.get("", response_model=SettingsRead)
-def get_settings(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    return _get_settings(db, tenant_id)
+def _get_or_create_settings(db: Session, tenant_id: int) -> CompanySettings:
+    settings = (
+        db.query(CompanySettings)
+        .filter(CompanySettings.tenant_id == tenant_id)
+        .first()
+    )
+    if settings:
+        return settings
 
-@router.put("", response_model=SettingsRead)
-def update_settings(data: SettingsUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    settings = _get_settings(db, tenant_id)
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(settings, key, value)
+    settings = CompanySettings(tenant_id=tenant_id)
+    db.add(settings)
     db.commit()
     db.refresh(settings)
     return settings
 
+
+@router.get("", response_model=SettingsRead)
+def get_settings(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    return _get_or_create_settings(db, tenant_id)
+
+
+@router.put("", response_model=SettingsRead)
+def update_settings(
+    data: SettingsUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    settings = _get_or_create_settings(db, tenant_id)
+    for key, value in data.model_dump(exclude_unset=True).items():
+        if key == "active_pdf_template":
+            settings.pdf_template = value
+        else:
+            setattr(settings, key, value)
+    db.commit()
+    db.refresh(settings)
+    return settings
+
+
 @router.post("/logo")
-def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    settings = _get_settings(db, tenant_id)
+def upload_logo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    settings = _get_or_create_settings(db, tenant_id)
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    ext = os.path.splitext(file.filename or "logo.png")[1]
+    ext = os.path.splitext(file.filename or "logo.png")[1] or ".png"
     filename = f"{uuid.uuid4().hex}{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
+    filepath = UPLOAD_DIR / filename
 
     with open(filepath, "wb") as f:
         f.write(file.file.read())
@@ -53,11 +81,14 @@ def upload_logo(file: UploadFile = File(...), db: Session = Depends(get_db), ten
 
     return {"logo_url": logo_url}
 
+
 @router.post("/onboarding-complete")
-def complete_onboarding(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
-    if not settings:
-        raise HTTPException(status_code=404, detail="Settings not found")
+def complete_onboarding(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    settings = _get_or_create_settings(db, tenant_id)
     settings.onboarding_completed = True
     db.commit()
+    db.refresh(settings)
     return {"status": "ok"}
