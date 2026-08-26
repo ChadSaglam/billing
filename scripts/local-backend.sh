@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$PROJECT_DIR/backend"
-BACKEND_PORT="${BACKEND_PORT:-8002}"
+BACKEND_PORT="${BACKEND_PORT:-9201}"
 
 cd "$PROJECT_DIR"
 [[ -f .env ]] || { echo ".env missing"; exit 1; }

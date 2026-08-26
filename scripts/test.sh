@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
 # test.sh — Comprehensive pre-deploy test suite
-# chadev-billing: Invoicing & Document Management
+# billing: Invoicing & Document Management
 #
 # Usage:
 #   ./scripts/test.sh              # run all checks
@@ -21,10 +21,10 @@ CYAN="\033[36m"; GREEN="\033[32m"; RED="\033[31m"; YELLOW="\033[33m"; DIM="\033[
 ERRORS=0; WARNINGS=0; PASSED=0
 
 COMPOSE="docker compose"
-BACKEND_URL="http://localhost:8001"
-FRONTEND_URL="http://localhost:5173"
-DB_USER="${POSTGRES_USER:-chadev}"
-DB_NAME="${POSTGRES_DB:-chadev_billing}"
+BACKEND_URL="http://localhost:9201"
+FRONTEND_URL="http://localhost:9200"
+DB_USER="${POSTGRES_USER:-billing}"
+DB_NAME="${POSTGRES_DB:-billing}"
 
 if [[ -f ".env" ]]; then
   set -a; source .env; set +a
@@ -42,7 +42,7 @@ should_run() {
   return 1
 }
 
-echo -e "${BOLD}🧾 chadev-billing — Pre-Deploy Tests${RESET}"
+echo -e "${BOLD}🧾 billing — Pre-Deploy Tests${RESET}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -397,7 +397,7 @@ if should_run "frontend-live"; then
 echo -e "${BOLD}8. Frontend${RESET}"
 
 if curl -sf "${FRONTEND_URL}" > /dev/null 2>&1; then
-  pass "Frontend dev server running (port 5173)"
+  pass "Frontend dev server running (port 9200)"
 else
   warn "Frontend not reachable at ${FRONTEND_URL}"
 fi
@@ -409,7 +409,7 @@ fi
 if should_run "ports"; then
 echo -e "${BOLD}9. Port Conflicts${RESET}"
 
-for port in 5434 8001 5173; do
+for port in 9202 9201 9200; do
   listeners=$(lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -cv "^COMMAND" 2>/dev/null || echo "0")
   listeners="${listeners//[^0-9]/}"
   [[ -z "$listeners" ]] && listeners=0

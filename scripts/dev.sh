@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
 # dev.sh — Start all services for local development
-# chadev-billing: Invoicing & Document Management
+# billing: Invoicing & Document Management
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -33,7 +33,7 @@ log_ok()    { echo -e "  ${GREEN}✓${RESET} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⊘${RESET} $1"; }
 log_error() { echo -e "  ${RED}✗${RESET} $1"; }
 
-echo -e "${BOLD}🧾 chadev-billing — Development Mode${RESET}"
+echo -e "${BOLD}🧾 billing — Development Mode${RESET}"
 echo ""
 
 # ── Validate .env ──────────────────────────────────────
@@ -43,10 +43,10 @@ if [[ ! -f ".env" ]]; then
 fi
 
 # ── Check port conflicts ──────────────────────────────
-for port in 5434 8001 5173; do
+for port in 9202 9201 9200; do
   if lsof -i :"$port" -sTCP:LISTEN > /dev/null 2>&1; then
     log_warn "Port $port already in use"
-    if [[ "$port" == "5173" ]]; then
+    if [[ "$port" == "9200" ]]; then
       log_error "Frontend port $port occupied — free it before starting"
       exit 1
     fi
@@ -60,7 +60,7 @@ log_ok "Database starting"
 
 log_info "Waiting for PostgreSQL..."
 for i in {1..30}; do
-  if docker compose exec -T db pg_isready -U chadev -d chadev_billing > /dev/null 2>&1; then
+  if docker compose exec -T db pg_isready -U billing -d billing > /dev/null 2>&1; then
     log_ok "PostgreSQL ready (${i}s)"
     break
   fi
@@ -72,11 +72,11 @@ for i in {1..30}; do
 done
 
 # ── Backend ────────────────────────────────────────────
-log_info "Starting backend (port 8001)..."
+log_info "Starting backend (port 9201)..."
 docker compose up -d backend 2>&1 | tee -a "$LOG_DIR/docker.log"
 
 for i in {1..30}; do
-  if curl -sf http://localhost:8001/docs > /dev/null 2>&1; then
+  if curl -sf http://localhost:9201/docs > /dev/null 2>&1; then
     log_ok "Backend ready (${i}s)"
     break
   fi
@@ -88,7 +88,7 @@ for i in {1..30}; do
 done
 
 # ── Frontend ───────────────────────────────────────────
-log_info "Starting frontend (port 5173)..."
+log_info "Starting frontend (port 9200)..."
 cd frontend
 
 if [[ ! -d "node_modules" ]] || [[ ! -f "node_modules/.package-lock.json" ]]; then
@@ -107,7 +107,7 @@ fi
 cd "$PROJECT_DIR"
 
 for i in {1..15}; do
-  if curl -sf http://localhost:5173 > /dev/null 2>&1; then
+  if curl -sf http://localhost:9200 > /dev/null 2>&1; then
     log_ok "Frontend ready (${i}s)"
     break
   fi
@@ -120,10 +120,10 @@ done
 
 echo ""
 echo -e "${GREEN}${BOLD}All services running:${RESET}"
-echo "  Frontend:  http://localhost:5173"
-echo "  Backend:   http://localhost:8001"
-echo "  API Docs:  http://localhost:8001/docs"
-echo "  Database:  PostgreSQL @ Docker (chadev_billing)"
+echo "  Frontend:  http://localhost:9200"
+echo "  Backend:   http://localhost:9201"
+echo "  API Docs:  http://localhost:9201/docs"
+echo "  Database:  PostgreSQL @ Docker (billing)"
 echo "  Logs:      $LOG_DIR/"
 echo ""
 echo "Press Ctrl+C to stop all services."

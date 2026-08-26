@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
 # project-overview.sh — Comprehensive project health & stats
-# chadev-billing: Invoicing & Document Management
+# billing: Invoicing & Document Management
 # ─────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -11,16 +11,16 @@ cd "$PROJECT_DIR"
 
 CYAN="\033[36m"; GREEN="\033[32m"; YELLOW="\033[33m"; RED="\033[31m"; RESET="\033[0m"; BOLD="\033[1m"; DIM="\033[2m"
 COMPOSE="docker compose"
-BACKEND_URL="http://localhost:8001"
-FRONTEND_URL="http://localhost:5173"
-DB_USER="${POSTGRES_USER:-chadev}"
-DB_NAME="${POSTGRES_DB:-chadev_billing}"
+BACKEND_URL="http://localhost:9201"
+FRONTEND_URL="http://localhost:9200"
+DB_USER="${POSTGRES_USER:-billing}"
+DB_NAME="${POSTGRES_DB:-billing}"
 
 if [[ -f ".env" ]]; then
   set -a; source .env; set +a
 fi
 
-echo -e "${BOLD}🧾 chadev-billing — Project Overview${RESET}"
+echo -e "${BOLD}🧾 billing — Project Overview${RESET}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -59,9 +59,9 @@ echo ""
 echo -e "${BOLD}Architecture${RESET}"
 echo "  ┌──────────────┐     ┌───────────────┐     ┌────────────┐"
 echo "  │  React/Vite  │────▶│   FastAPI     │────▶│ PostgreSQL │"
-echo "  │    :5173     │     │    :8001      │     │   :5432    │"
+echo "  │    :9200     │     │    :9201      │     │   :9202    │"
 echo "  └──────────────┘     └───────────────┘     └────────────┘"
-echo "   Tailwind/shadcn     SQLAlchemy/Alembic    chadev_billing"
+echo "   Tailwind/shadcn     SQLAlchemy/Alembic    billing"
 echo ""
 
 # ── Backend Detail ──────────────────────────────────────
@@ -153,7 +153,7 @@ echo ""
 echo -e "${BOLD}Service Status${RESET}"
 
 if curl -sf "${BACKEND_URL}/docs" > /dev/null 2>&1; then
-  echo -e "  API:        ${GREEN}● Running${RESET} (port 8001)"
+  echo -e "  API:        ${GREEN}● Running${RESET} (port 9201)"
   echo -e "  ${DIM}Docs: ${BACKEND_URL}/docs${RESET}"
 
   echo -e "  ${DIM}Endpoints:${RESET}"
@@ -170,7 +170,7 @@ else
 fi
 
 if curl -sf "${FRONTEND_URL}" > /dev/null 2>&1; then
-  echo -e "  Frontend:   ${GREEN}● Running${RESET} (port 5173)"
+  echo -e "  Frontend:   ${GREEN}● Running${RESET} (port 9200)"
 else
   echo -e "  Frontend:   ${RED}● Offline${RESET}"
 fi

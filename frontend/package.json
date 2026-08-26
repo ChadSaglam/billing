@@ -1,14 +1,16 @@
 {
-  "name": "frontend-tmp",
+  "name": "billing-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate-api": "openapi-typescript http://localhost:8002/openapi.json -o src/types/api.generated.ts"
+    "generate-api": "openapi-typescript http://localhost:9201/openapi.json -o src/types/api.generated.ts",
+    "typecheck": "tsc -b --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",

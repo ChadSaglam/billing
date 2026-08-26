@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
-# setup.sh — First-time project setup for chadev-billing
+# setup.sh — First-time project setup for billing
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -14,7 +14,7 @@ log_ok()    { echo -e "  ${GREEN}✓${RESET} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⊘${RESET} $1"; }
 log_error() { echo -e "  ${RED}✗${RESET} $1"; }
 
-echo -e "${BOLD}🧾 chadev-billing — Setup${RESET}"
+echo -e "${BOLD}🧾 billing — Setup${RESET}"
 echo ""
 
 # ── Prerequisites ──────────────────────────────────────
@@ -92,7 +92,7 @@ echo ""
 
 # ── Port Check ─────────────────────────────────────────
 echo -e "${BOLD}Checking ports...${RESET}"
-for port in 5434 8001 5173; do
+for port in 9202 9201 9200; do
   if lsof -i :"$port" -sTCP:LISTEN > /dev/null 2>&1; then
     proc_pid=$(lsof -i :"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
     proc_name=$(ps -p "$proc_pid" -o comm= 2>/dev/null || echo "unknown")

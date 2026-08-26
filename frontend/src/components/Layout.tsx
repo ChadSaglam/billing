@@ -95,7 +95,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Sidebar Header */}
           <div className={cn('flex h-14 items-center border-b px-3', collapsed ? 'justify-center' : 'gap-2 px-4')}>
             <Receipt className="h-6 w-6 text-primary shrink-0" />
-            {!collapsed && <span className="text-lg font-semibold tracking-tight">ChaDev</span>}
+            {!collapsed && <span className="text-lg font-semibold tracking-tight">Billing</span>}
             <button
               className="ml-auto lg:hidden rounded-sm p-1 hover:bg-accent"
               onClick={() => setMobileOpen(false)}
