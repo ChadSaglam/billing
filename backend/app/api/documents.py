@@ -1,20 +1,21 @@
-import io
-from io import BytesIO
 import csv
-import zipfile
 import datetime as dt
-from datetime import timedelta
+import io
+import zipfile
+from datetime import date, timedelta
 from decimal import Decimal
+from io import BytesIO
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import get_tenant_id
+from app.auth import get_tenant_id, require_writable_tenant
 from app.database import get_db
 from app.models.document import Document
 from app.models.line_item import LineItem
 from app.models.settings import CompanySettings
+from app.plans import enforce_limit
 from app.schemas.document import (
     BulkActionRequest,
     BulkStatusRequest,
@@ -200,7 +201,20 @@ def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
     return doc
 
 @router.post("", response_model=DocumentRead, status_code=201)
-def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def create_document(
+    data: DocumentCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    tenant=Depends(require_writable_tenant),
+):
+    month_start = date.today().replace(day=1)
+    enforce_limit(
+        tenant.plan,
+        "max_documents_month",
+        db.query(Document)
+        .filter(Document.tenant_id == tenant_id, Document.created_at >= month_start)
+        .count(),
+    )
     doc_data = data.model_dump(exclude={"line_items", "document_number"})
     doc_number = data.document_number
     if not doc_number:
@@ -431,16 +445,20 @@ def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
 
 @router.get("/{doc_id}/preview")
 def preview_pdf(doc_id: int, template: str = Query("modern"), token: str = Query(None), db: Session = Depends(get_db)):
-    from jose import JWTError, jwt as jose_jwt
+    from jose import JWTError
+    from jose import jwt as jose_jwt
+
     from app.config import settings as app_settings
 
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
         payload = jose_jwt.decode(token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Invalid token")
         tenant_id = payload["tid"]
     except (JWTError, KeyError):
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token") from None
 
     doc = _load_full(db, doc_id, tenant_id)
     if not doc:

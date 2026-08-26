@@ -3,9 +3,10 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import get_tenant_id
+from app.auth import get_tenant_id, require_writable_tenant
 from app.database import get_db
 from app.models.client import Client
+from app.plans import enforce_limit
 from app.schemas.client import ClientCreate, ClientRead, ClientUpdate
 
 router = APIRouter(prefix="/api/clients", tags=["clients"])
@@ -40,7 +41,17 @@ def get_client(client_id: int, db: Session = Depends(get_db), tenant_id: int = D
 
 
 @router.post("", response_model=ClientRead, status_code=201)
-def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def create_client(
+    data: ClientCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    tenant=Depends(require_writable_tenant),
+):
+    enforce_limit(
+        tenant.plan,
+        "max_clients",
+        db.query(Client).filter(Client.tenant_id == tenant_id).count(),
+    )
     existing = db.query(Client).filter(
         Client.tenant_id == tenant_id,
         Client.customer_number == data.customer_number,
@@ -54,7 +65,7 @@ def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: 
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Duplicate client entry")
+        raise HTTPException(status_code=409, detail="Duplicate client entry") from None
     db.refresh(client)
     return client
 

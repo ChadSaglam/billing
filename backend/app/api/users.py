@@ -3,9 +3,10 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, get_tenant_id, hash_password
+from app.auth import get_current_user, get_tenant_id, hash_password, require_writable_tenant
 from app.database import get_db
 from app.models.user import User
+from app.plans import enforce_limit
 from app.schemas.user import InviteRequest, InviteResponse, UserRead, UserUpdate
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -37,7 +38,13 @@ def invite_user(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     _admin: User = Depends(_require_admin),
+    tenant=Depends(require_writable_tenant),
 ):
+    enforce_limit(
+        tenant.plan,
+        "max_users",
+        db.query(User).filter(User.tenant_id == tenant_id).count(),
+    )
     if data.role not in ("admin", "editor", "viewer"):
         raise HTTPException(status_code=400, detail="Role must be admin, editor, or viewer")
     if db.query(User).filter(User.email == data.email).first():
