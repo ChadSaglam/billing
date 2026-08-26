@@ -1,8 +1,8 @@
-# ChaDev Billing — Offerte & Rechnungen Software
+# Billing — Offerte & Rechnungen Software
 
 ## Overview
 
-A billing/invoicing application for **ChaDev**, a Swiss web development consultancy.
+A billing/invoicing application for **Acme GmbH (example tenant)**, a Swiss web development consultancy.
 Designed for SaaS-readiness — modular, extensible, and usable by other companies.
 
 - **Backend**: FastAPI (Python 3.12) + SQLAlchemy 2.0 + Pydantic v2 + PostgreSQL 16
@@ -15,15 +15,15 @@ Designed for SaaS-readiness — modular, extensible, and usable by other compani
 
 | Field                | Value                                    |
 |----------------------|------------------------------------------|
-| Company              | ChaDev                                   |
-| Address              | Hohlstrasse 485A, 8048 Zürich            |
-| UID                  | ***REMOVED***                          |
+| Company              | Acme GmbH (example tenant)                                   |
+| Address              | Musterstrasse 1 (example), 8048 Zürich            |
+| UID                  | CHE-123.456.789 (example)                          |
 | Bank                 | Migros Bank AG                           |
-| IBAN                 | ***REMOVED***               |
+| IBAN                 | CH00 0000 0000 0000 0000 0 (example)               |
 | BIC/Swift            | MIGRCHZZXXX                              |
-| Email                | info@chadev.ch                           |
-| Phone                | ***REMOVED***                         |
-| Website              | www.chadev.ch                            |
+| Email                | info@example.ch                           |
+| Phone                | +41 00 000 00 00 (example)                         |
+| Website              | www.example.ch                            |
 | Default hourly rate  | 250.00 CHF                               |
 | Default payment terms| 30 days                                  |
 
@@ -255,9 +255,9 @@ Designed for SaaS-readiness — modular, extensible, and usable by other compani
 
 ## PDF Invoice Format
 
-Based on actual ChaDev invoices:
+Based on actual Acme GmbH (example tenant) invoices:
 
-1. Company logo area (ChaDev header)
+1. Company logo area (Acme GmbH (example tenant) header)
 2. Client address block (left) | Invoice details (right: Nr, Datum, Kundennummer, UID)
 3. Location + Date line
 4. "Rechnung Nr. XXXX" heading
@@ -265,7 +265,7 @@ Based on actual ChaDev invoices:
 6. Line items table: Pos, Bezeichnung/Beschreibung, Menge, Preis/Stück, Positionspreis
 7. Zwischensumme, optional Preisnachlass (discount), Rechnungsbetrag
 8. Payment note: "Wir bitten Sie um Überweisung des Rechnungsbetrages innerhalb von X Tagen."
-9. "Mit freundlichen Grüssen, ChaDev"
+9. "Mit freundlichen Grüssen, Acme GmbH (example tenant)"
 10. Footer: Company details, bank info, contact
 11. Page 2: Swiss QR-bill payment slip
 
@@ -345,12 +345,12 @@ Based on actual ChaDev invoices:
 
 ```env
 # Backend
-DATABASE_URL=postgresql://chadev:chadev@db:5432/chadev_billing
+DATABASE_URL=postgresql://billing:${POSTGRES_PASSWORD}@db:5432/billing
 
 # Frontend
-VITE_API_URL=http://localhost:8002
+VITE_API_URL=http://localhost:9201
 ```
 
 ## License
 
-Private — ChaDev internal use.
+Private — Acme GmbH (example tenant) internal use.

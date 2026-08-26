@@ -21,9 +21,12 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Env
+# Env — catch EVERY variant (.env.bak was committed once; never again)
 .env
-*.env.local
+.env.*
+*.env
+*.env.*
+!.env.example
 
 # Docker
 pgdata/
@@ -32,3 +35,14 @@ uploads
 structure.txt
 
 .logs/
+
+# Test / tooling artifacts
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+
+# Local-only secret list for scripts/scrub-git-history.sh
+scripts/.scrub-extra

@@ -34,9 +34,14 @@ def seed_services(db: Session, tenant_id: int) -> int:
 
 
 def run_seed(db: Session, tenant_id: int) -> dict:
-    client1 = Client(tenant_id=tenant_id, customer_number="90014", company_name="Ammann + Schmid AG", street="Freiestrasse 39", postal_code="8610", city="Uster", country="Schweiz")
-    client2 = Client(tenant_id=tenant_id, customer_number="90012", company_name="RDS Isolierungen GmbH", street="Grüzefeldstrasse 51", postal_code="8404", city="Winterthur", country="Schweiz")
-    client3 = Client(tenant_id=tenant_id, customer_number="90025", company_name="Sky - Net Logistik GmbH", street="Bösch 21", postal_code="6331", city="Hünenberg", country="Schweiz", email="info@sky-net-logistik.ch")
+    """Fictional demo data for one workspace.
+
+    Everything here ships to every customer who clicks "load demo data" — it
+    must never contain a real client, address, email or invoice.
+    """
+    client1 = Client(tenant_id=tenant_id, customer_number="10001", company_name="Muster Bau AG", street="Bahnhofstrasse 12", postal_code="8001", city="Zürich", country="Schweiz", email="kontakt@muster-bau.example")
+    client2 = Client(tenant_id=tenant_id, customer_number="10002", company_name="Beispiel Technik GmbH", street="Industriestrasse 4", postal_code="8400", city="Winterthur", country="Schweiz", email="info@beispiel-technik.example")
+    client3 = Client(tenant_id=tenant_id, customer_number="10003", company_name="Demo Logistik AG", street="Seestrasse 88", postal_code="6300", city="Zug", country="Schweiz", email="hallo@demo-logistik.example")
 
     db.add_all([client1, client2, client3])
     db.flush()
