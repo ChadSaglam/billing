@@ -18,8 +18,12 @@ class Tenant(Base):
     # ── Subscription ────────────────────────────────────────
     # plan:   trial | starter | pro | business
     # status: active | past_due | canceled | suspended
-    plan: Mapped[str] = mapped_column(String(32), default="trial", nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    plan: Mapped[str] = mapped_column(
+        String(32), default="trial", nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), default="active", nullable=False, index=True
+    )
     trial_ends_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Set once the tenant is paying through an external provider (Stripe etc.)

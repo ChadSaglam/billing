@@ -13,7 +13,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register */
+        /**
+         * Register
+         * @description Self-serve signup: creates the workspace, the owner, and a trial.
+         */
         post: operations["register_api_auth_register_post"];
         delete?: never;
         options?: never;
@@ -66,6 +69,68 @@ export interface paths {
         get: operations["get_me_api_auth_me_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Workspace */
+        get: operations["get_workspace_api_tenant_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenant/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plans
+         * @description Public price list — drives the pricing page and the upgrade wall.
+         */
+        get: operations["list_plans_api_tenant_plans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenant/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Plan
+         * @description Switch plan.
+         *
+         *     TODO(payments): this is the hook point for Stripe. Today it flips the
+         *     column directly, which is fine while you are pre-revenue — but before
+         *     launch this must only run from a verified provider webhook, never from
+         *     a client request.
+         */
+        post: operations["change_plan_api_tenant_plan_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -550,7 +615,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Seed Data */
+        /**
+         * Seed Data
+         * @description Fill the caller's own workspace with demo data. Never touches other tenants.
+         */
         post: operations["seed_data_api_seed_post"];
         delete?: never;
         options?: never;
@@ -1030,6 +1098,28 @@ export interface components {
             /** Outstanding */
             outstanding: string;
         };
+        /** PlanChange */
+        PlanChange: {
+            /** Plan */
+            plan: string;
+        };
+        /** PlanRead */
+        PlanRead: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Price Chf Month */
+            price_chf_month: number;
+            /** Max Users */
+            max_users: number;
+            /** Max Clients */
+            max_clients: number;
+            /** Max Documents Month */
+            max_documents_month: number;
+            /** Features */
+            features: string[];
+        };
         /** PortalDocumentRead */
         PortalDocumentRead: {
             /** Id */
@@ -1287,6 +1377,31 @@ export interface components {
             /** Payment Reference */
             payment_reference?: string | null;
         };
+        /** TenantRead */
+        TenantRead: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Plan */
+            plan: string;
+            /** Plan Name */
+            plan_name: string;
+            /** Status */
+            status: string;
+            /** Trial Ends At */
+            trial_ends_at: string | null;
+            /** Trial Days Left */
+            trial_days_left: number | null;
+            /** Is Usable */
+            is_usable: boolean;
+            /** Usage */
+            usage: {
+                [key: string]: components["schemas"]["UsageItem"];
+            };
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -1298,6 +1413,13 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+        };
+        /** UsageItem */
+        UsageItem: {
+            /** Used */
+            used: number;
+            /** Limit */
+            limit: number;
         };
         /** UserRead */
         UserRead: {
@@ -1331,6 +1453,14 @@ export interface components {
             tenant_id: number;
             /** Tenant Name */
             tenant_name: string;
+            /** Plan */
+            plan: string;
+            /** Plan Name */
+            plan_name: string;
+            /** Tenant Status */
+            tenant_status: string;
+            /** Trial Ends At */
+            trial_ends_at?: string | null;
         };
         /** UserUpdate */
         UserUpdate: {
@@ -1474,6 +1604,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    get_workspace_api_tenant_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantRead"];
+                };
+            };
+        };
+    };
+    list_plans_api_tenant_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanRead"][];
+                };
+            };
+        };
+    };
+    change_plan_api_tenant_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -34,13 +34,13 @@ def upgrade() -> None:
         )
     )
 
-    op.create_index("ix_tenants_plan", "tenants", ["plan"])
-    op.create_index("ix_tenants_status", "tenants", ["status"])
+    op.create_index("ix_tenants_plan", "tenants", ["plan"], if_not_exists=True)
+    op.create_index("ix_tenants_status", "tenants", ["status"], if_not_exists=True)
 
 
 def downgrade() -> None:
-    op.drop_index("ix_tenants_status", table_name="tenants")
-    op.drop_index("ix_tenants_plan", table_name="tenants")
+    op.drop_index("ix_tenants_status", table_name="tenants", if_exists=True)
+    op.drop_index("ix_tenants_plan", table_name="tenants", if_exists=True)
     for col in (
         "is_active",
         "billing_subscription_id",

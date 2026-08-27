@@ -4,9 +4,7 @@ import datetime as dt
 
 import pytest
 
-from tests.conftest import needs_db
-
-pytestmark = needs_db
+pytestmark = pytest.mark.db
 
 
 def test_signup_creates_workspace_with_trial(client, db, make_workspace):

@@ -39,10 +39,23 @@ def _postgres_available() -> bool:
 
 
 POSTGRES_UP = _postgres_available()
-needs_db = pytest.mark.skipif(
-    not POSTGRES_UP,
-    reason=f"No PostgreSQL at {TEST_DATABASE_URL} — run `docker compose up -d db`",
-)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip @pytest.mark.db tests when there is no database.
+
+    Done here rather than exporting a decorator, because `from tests.conftest
+    import ...` only works if tests/ happens to be importable as a package —
+    it is not, and pytest never guarantees it.
+    """
+    if POSTGRES_UP:
+        return
+    skip = pytest.mark.skip(
+        reason=f"No PostgreSQL at {TEST_DATABASE_URL} — run `docker compose up -d db`"
+    )
+    for item in items:
+        if "db" in item.keywords:
+            item.add_marker(skip)
 
 
 def _load_app():
@@ -117,7 +130,7 @@ def make_workspace(client):
         counter["n"] += 1
         n = counter["n"]
         company = company or f"Test Company {n}"
-        email = f"owner{n}@example.test"
+        email = f"owner{n}@billing-tests.com"
         password = "correct-horse-battery-staple"  # noqa: S105
         resp = client.post(
             "/api/auth/register",

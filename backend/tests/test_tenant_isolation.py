@@ -9,9 +9,7 @@ When you add an endpoint, add it here.
 
 import pytest
 
-from tests.conftest import needs_db
-
-pytestmark = needs_db
+pytestmark = pytest.mark.db
 
 
 @pytest.fixture
@@ -55,6 +53,7 @@ def _create_document(client, ws, client_id: int) -> int:
                     "description": "Beratung",
                     "quantity": "2",
                     "unit_price": "250.00",
+                    "total_price": "500.00",
                     "unit": "Stunde",
                 }
             ],
@@ -156,7 +155,7 @@ def test_dashboard_totals_do_not_mix_tenants(client, two_workspaces):
     dash_b = client.get("/api/dashboard", headers=b["headers"])
     assert dash_b.status_code == 200
     body = dash_b.json()
-    numeric = [v for v in body.values() if isinstance(v, (int, float))]
+    numeric = [v for v in body.values() if isinstance(v, int | float)]
     assert all(v == 0 for v in numeric), body
 
 
