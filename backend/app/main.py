@@ -7,13 +7,15 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import auth, clients, dashboard, documents, portal, services, settings, tenant, users
 from app.auth import get_current_user
@@ -96,6 +98,32 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+class CatchUnhandledErrors(BaseHTTPMiddleware):
+    """Turn an unhandled exception into a normal 500 response.
+
+    Starlette's own 500 handler sits OUTSIDE CORSMiddleware, so a crash comes
+    back with no Access-Control-Allow-Origin header and the browser reports it
+    as a CORS error. That sends you looking at CORS config when the real
+    problem is a traceback in the log. Catching it here — inside CORS — means
+    a crash looks like a crash.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception:
+            log.exception("Unhandled error on %s %s", request.method, request.url.path)
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
+
+
+# Order matters: this is added FIRST so CORSMiddleware ends up outermost and
+# gets to attach its headers to the response above.
+app.add_middleware(CatchUnhandledErrors)
 
 app.add_middleware(
     CORSMiddleware,

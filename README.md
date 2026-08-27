@@ -51,6 +51,19 @@ cp .env.example .env
 
 ---
 
+## Upgrading an existing database
+
+`create_all()` creates missing tables but never adds columns to tables that
+already exist, so a database built by an older version of the app silently
+lacks anything added since — you find out when a query fails with
+`column ... does not exist`.
+
+```bash
+./scripts/db-upgrade.sh     # stamps if needed, upgrades, verifies
+```
+
+---
+
 ## Demo data
 
 The seed endpoint fills **your own workspace** — it never touches other tenants.
