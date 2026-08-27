@@ -174,21 +174,29 @@ round-trip → frontend lint+typecheck+build → API-types drift check → docke
 
 Ordered by how much they hurt.
 
-1. **Refresh tokens can't be revoked.** 30-day lifetime, no rotation, no
+1. **There is no initial migration.** The chain starts from a schema that
+   `create_all()` already built, so `alembic upgrade head` against an empty
+   database fails at the first revision. A fresh server cannot be built from
+   migrations alone. Fix: squash the four revisions into one initial
+   migration generated from the current models, then `alembic stamp` the
+   existing databases onto it. Until then CI tests the newest migration by
+   doing what the app does — `create_all` + `stamp head`, then a
+   downgrade/upgrade round trip.
+2. **Refresh tokens can't be revoked.** 30-day lifetime, no rotation, no
    denylist — logout doesn't really log out. Add a `revoked_jti` table.
-2. **Portal tokens never expire.** `api/portal.py` looks up a document by token
+3. **Portal tokens never expire.** `api/portal.py` looks up a document by token
    with no TTL and no access log. Add `portal_token_expires_at`.
-3. **Background jobs run in the web process.** Fine at 1 worker; at 2 every
+4. **Background jobs run in the web process.** Fine at 1 worker; at 2 every
    recurring invoice is created twice. Move to a worker container or take a
    Postgres advisory lock before scaling out.
-4. **`api/documents.py` (600+ lines) and `services/pdf_generator.py` (660+)**
+5. **`api/documents.py` (600+ lines) and `services/pdf_generator.py` (660+)**
    are 40% of the backend. Split into `services/documents/` and put tenant
    scoping in a repository layer, so rule #1 stops being manual.
-5. **No i18n.** German is hardcoded in ~30 components and in the PDF templates.
+6. **No i18n.** German is hardcoded in ~30 components and in the PDF templates.
    Switzerland needs DE/FR/IT/EN, and language belongs on the *client* record.
-6. **`print()`-era observability.** stdlib logging is wired up; there is still
+7. **`print()`-era observability.** stdlib logging is wired up; there is still
    no request ID and no Sentry.
-7. **No AI features.** Planned: NL→invoice draft, receipt OCR, auto-dunning,
+8. **No AI features.** Planned: NL→invoice draft, receipt OCR, auto-dunning,
    NL search. Gate them behind `require_feature(plan, "ai")`.
 
 ---
