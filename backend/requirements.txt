@@ -15,7 +15,7 @@ svgwrite==1.4.3
 python-stdnum==2.2
 slowapi==0.1.9
 bleach==6.2.0
-python-dateutil==2.9.0
+python-dateutil==2.9.0.post0
 reportlab==4.1.0
 bcrypt==4.0.1
 qrcode[pil]>=7.0
