@@ -1,7 +1,6 @@
 from datetime import date as DateType
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -33,7 +32,7 @@ class DocumentBase(BaseModel):
     document_type: str
     client_id: int
     date: DateType
-    due_date: Optional[DateType] = None
+    due_date: DateType | None = None
     payment_terms_days: int = 30
     status: str = "draft"
     subtotal: Decimal = Decimal("0")
@@ -42,53 +41,53 @@ class DocumentBase(BaseModel):
     vat_amount: Decimal = Decimal("0")
     total: Decimal = Decimal("0")
     currency: str = "CHF"
-    notes: Optional[str] = None
-    recurrence: Optional[str] = None
+    notes: str | None = None
+    recurrence: str | None = None
 
 
 class DocumentCreate(DocumentBase):
-    document_number: Optional[str] = None
+    document_number: str | None = None
     line_items: list[LineItemCreate] = []
 
 
 class DocumentUpdate(BaseModel):
-    document_type: Optional[str] = None
-    client_id: Optional[int] = None
-    date: Optional[DateType] = None
-    due_date: Optional[DateType] = None
-    payment_terms_days: Optional[int] = None
-    status: Optional[str] = None
-    subtotal: Optional[Decimal] = None
-    discount_percent: Optional[Decimal] = None
-    discount_amount: Optional[Decimal] = None
-    vat_amount: Optional[Decimal] = None
-    total: Optional[Decimal] = None
-    currency: Optional[str] = None
-    notes: Optional[str] = None
-    recurrence: Optional[str] = None
-    line_items: Optional[list[LineItemCreate]] = None
+    document_type: str | None = None
+    client_id: int | None = None
+    date: DateType | None = None
+    due_date: DateType | None = None
+    payment_terms_days: int | None = None
+    status: str | None = None
+    subtotal: Decimal | None = None
+    discount_percent: Decimal | None = None
+    discount_amount: Decimal | None = None
+    vat_amount: Decimal | None = None
+    total: Decimal | None = None
+    currency: str | None = None
+    notes: str | None = None
+    recurrence: str | None = None
+    line_items: list[LineItemCreate] | None = None
 
 
 class StatusUpdate(BaseModel):
     status: str
-    paid_at: Optional[DateType] = None
-    payment_method: Optional[str] = None
-    payment_reference: Optional[str] = None
+    paid_at: DateType | None = None
+    payment_method: str | None = None
+    payment_reference: str | None = None
 
 
 class DocumentRead(DocumentBase):
     id: int
     document_number: str
-    converted_from_id: Optional[int] = None
-    paid_at: Optional[DateType] = None
-    payment_method: Optional[str] = None
-    payment_reference: Optional[str] = None
-    next_recurrence_date: Optional[DateType] = None
-    portal_token: Optional[str] = None
+    converted_from_id: int | None = None
+    paid_at: DateType | None = None
+    payment_method: str | None = None
+    payment_reference: str | None = None
+    next_recurrence_date: DateType | None = None
+    portal_token: str | None = None
     created_at: datetime
     updated_at: datetime
     line_items: list[LineItemRead] = []
-    client: Optional[ClientRead] = None
+    client: ClientRead | None = None
     model_config = {"from_attributes": True}
 
 
@@ -98,14 +97,14 @@ class DocumentListRead(BaseModel):
     document_number: str
     client_id: int
     date: DateType
-    due_date: Optional[DateType] = None
+    due_date: DateType | None = None
     status: str
     total: Decimal
     vat_amount: Decimal = Decimal("0")
     currency: str
-    recurrence: Optional[str] = None
+    recurrence: str | None = None
     created_at: datetime
-    client: Optional[ClientRead] = None
+    client: ClientRead | None = None
     model_config = {"from_attributes": True}
 
 
@@ -115,7 +114,7 @@ class PortalDocumentRead(BaseModel):
     document_type: str
     document_number: str
     date: DateType
-    due_date: Optional[DateType] = None
+    due_date: DateType | None = None
     payment_terms_days: int
     status: str
     subtotal: Decimal
@@ -124,10 +123,10 @@ class PortalDocumentRead(BaseModel):
     vat_amount: Decimal
     total: Decimal
     currency: str
-    notes: Optional[str] = None
+    notes: str | None = None
     line_items: list[LineItemRead] = []
-    client: Optional[ClientRead] = None
-    company_name: Optional[str] = None
+    client: ClientRead | None = None
+    company_name: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -139,6 +138,6 @@ class BulkActionRequest(BaseModel):
 class BulkStatusRequest(BaseModel):
     document_ids: list[int]
     status: str
-    paid_at: Optional[DateType] = None
-    payment_method: Optional[str] = None
-    payment_reference: Optional[str] = None
+    paid_at: DateType | None = None
+    payment_method: str | None = None
+    payment_reference: str | None = None

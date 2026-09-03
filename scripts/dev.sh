@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
 # dev.sh — Start all services for local development
-# chadev-billing: Invoicing & Document Management
+# billing: Invoicing & Document Management
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -33,7 +33,7 @@ log_ok()    { echo -e "  ${GREEN}✓${RESET} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⊘${RESET} $1"; }
 log_error() { echo -e "  ${RED}✗${RESET} $1"; }
 
-echo -e "${BOLD}🧾 chadev-billing — Development Mode${RESET}"
+echo -e "${BOLD}🧾 billing — Development Mode${RESET}"
 echo ""
 
 # ── Validate .env ──────────────────────────────────────

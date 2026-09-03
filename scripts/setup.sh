@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
-# setup.sh — First-time project setup for chadev-billing
+# setup.sh — First-time project setup for billing
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -14,7 +14,7 @@ log_ok()    { echo -e "  ${GREEN}✓${RESET} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⊘${RESET} $1"; }
 log_error() { echo -e "  ${RED}✗${RESET} $1"; }
 
-echo -e "${BOLD}🧾 chadev-billing — Setup${RESET}"
+echo -e "${BOLD}🧾 billing — Setup${RESET}"
 echo ""
 
 # ── Prerequisites ──────────────────────────────────────

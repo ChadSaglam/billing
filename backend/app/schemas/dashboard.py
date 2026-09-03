@@ -1,6 +1,9 @@
 from decimal import Decimal
+
 from pydantic import BaseModel
+
 from app.schemas.document import DocumentRead
+
 
 class MonthlyRevenue(BaseModel):
     month: str

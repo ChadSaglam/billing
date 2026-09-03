@@ -1,0 +1,16 @@
+# gitleaks configuration for the billing repo
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Non-secret test and placeholder values"
+paths = [
+  '''\.github/workflows/.*\.yml''',
+  '''backend/tests/.*''',
+  '''SPEC\.md''',
+]
+regexes = [
+  '''ci-only-secret-not-used-in-production''',
+  '''test-secret-key-not-for-production''',
+  '''\*\*\*REMOVED\*\*\*''',
+]

@@ -1,10 +1,10 @@
-import io
-from io import BytesIO
 import csv
-import zipfile
 import datetime as dt
+import io
+import zipfile
 from datetime import timedelta
 from decimal import Decimal
+from io import BytesIO
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -431,7 +431,9 @@ def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
 
 @router.get("/{doc_id}/preview")
 def preview_pdf(doc_id: int, template: str = Query("modern"), token: str = Query(None), db: Session = Depends(get_db)):
-    from jose import JWTError, jwt as jose_jwt
+    from jose import JWTError
+    from jose import jwt as jose_jwt
+
     from app.config import settings as app_settings
 
     if not token:
@@ -440,7 +442,7 @@ def preview_pdf(doc_id: int, template: str = Query("modern"), token: str = Query
         payload = jose_jwt.decode(token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
         tenant_id = payload["tid"]
     except (JWTError, KeyError):
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token") from None
 
     doc = _load_full(db, doc_id, tenant_id)
     if not doc:

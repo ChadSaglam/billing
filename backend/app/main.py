@@ -1,29 +1,24 @@
-import os
-from pathlib import Path
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from fastapi import FastAPI, Depends, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
-
-from app.api import auth, clients, dashboard, documents, services, settings, users
-from app.api import portal
+from app.api import auth, clients, dashboard, documents, portal, services, settings, users
 from app.auth import get_current_user
 from app.config import settings as app_settings
 from app.database import Base, SessionLocal, engine, get_db
+from app.limiter import limiter
 from app.models.user import User
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = BASE_DIR / "uploads"
 LOGOS_DIR = UPLOADS_DIR / "logos"
-
-limiter = Limiter(key_func=get_remote_address)
 
 async def _background_jobs():
     import asyncio

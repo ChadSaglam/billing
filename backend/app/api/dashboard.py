@@ -1,8 +1,10 @@
 import datetime as dt
 from decimal import Decimal
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, extract, case, cast, String
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
+
 from app.auth import get_tenant_id
 from app.database import get_db
 from app.models.client import Client

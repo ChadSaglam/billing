@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
 # test.sh — Comprehensive pre-deploy test suite
-# chadev-billing: Invoicing & Document Management
+# billing: Invoicing & Document Management
 #
 # Usage:
 #   ./scripts/test.sh              # run all checks
@@ -26,8 +26,12 @@ FRONTEND_URL="http://localhost:5173"
 DB_USER="${POSTGRES_USER:-chadev}"
 DB_NAME="${POSTGRES_DB:-chadev_billing}"
 
+# NOTE: deliberately NOT `set -a`. Exporting .env into the environment breaks
+# JSON-valued settings — bash strips the quotes from ALLOWED_ORIGINS=["..."],
+# and pydantic-settings then fails to parse it in any child process (pytest,
+# alembic, uvicorn). The values are still readable by this script.
 if [[ -f ".env" ]]; then
-  set -a; source .env; set +a
+  source .env
 fi
 
 # Determine which sections to run
@@ -42,7 +46,7 @@ should_run() {
   return 1
 }
 
-echo -e "${BOLD}🧾 chadev-billing — Pre-Deploy Tests${RESET}"
+echo -e "${BOLD}🧾 billing — Pre-Deploy Tests${RESET}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

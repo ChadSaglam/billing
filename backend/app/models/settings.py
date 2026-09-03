@@ -1,9 +1,10 @@
 from decimal import Decimal
 
-from sqlalchemy import Numeric, String, ForeignKey
+from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+
 
 class CompanySettings(Base):
     __tablename__ = "company_settings"

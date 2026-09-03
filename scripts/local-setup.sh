@@ -22,7 +22,7 @@ require_cmd() {
   command -v "$cmd" >/dev/null 2>&1 || fail "$cmd not found. $hint"
 }
 
-echo -e "${BOLD}chadev-billing local setup${RESET}"
+echo -e "${BOLD}billing local setup${RESET}"
 
 require_cmd python3 "Install Python 3.12+"
 require_cmd node "Install Node.js"

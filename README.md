@@ -30,7 +30,7 @@ Invoice and quote management software for **ChaDev** — built with FastAPI, Rea
 ## Quick Start (Docker)
 
 ```bash
-cd chadev-billing
+cd billing
 
 # Build and start all services
 docker-compose up --build
@@ -142,7 +142,7 @@ Press `Ctrl+C` in the terminal running `local-dev.sh`.
 ## Project Structure
 
 ```
-chadev-billing/
+billing/
 ├── backend/
 │   ├── app/
 │   │   ├── api/                    # FastAPI route handlers
@@ -264,7 +264,7 @@ Rechnung:  Draft → Sent → Paid
 
 ## Deployment
 
-See `chadev-billing-deployment-guide.md` for full instructions on deploying to a Hostinger VPS with Docker, Nginx, SSL, and the `chadev.space` domain.
+See `billing-deployment-guide.md` for full instructions on deploying to a Hostinger VPS with Docker, Nginx, SSL, and the `chadev.space` domain.
 
 ## License
 

@@ -54,7 +54,7 @@ def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: 
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Duplicate client entry")
+        raise HTTPException(status_code=409, detail="Duplicate client entry") from None
     db.refresh(client)
     return client
 
