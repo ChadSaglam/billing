@@ -157,32 +157,40 @@ jobs:
       - name: Write CI .env
         run: |
           cat > .env <<'ENVEOF'
+          APP_ENV=development
           POSTGRES_USER=chadev
           POSTGRES_PASSWORD=ci-password
-          POSTGRES_DB=chadev_billing
-          DB_PORT=5434
+          POSTGRES_DB=billing
+          DB_PORT=9202
+          BACKEND_PORT=9201
+          FRONTEND_PORT=9200
           SECRET_KEY=ci-only-secret-not-used-in-production
-          ALLOWED_ORIGINS=["http://localhost:5173"]
-          FRONTEND_URL=http://localhost:5173
-          VITE_API_URL=http://localhost:8001
+          ALLOWED_ORIGINS=http://localhost:9200
+          FRONTEND_URL=http://localhost:9200
+          VITE_API_URL=http://localhost:9201
           ENVEOF
 
       - name: docker compose config is valid
         run: docker compose config >/dev/null
 
       - name: Boot the stack
-        run: docker compose up -d --wait --wait-timeout 180
+        run: docker compose up -d --wait --wait-timeout 300
 
-      - name: Health endpoint responds
+      - name: Backend is healthy and migrated
         run: |
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8001/api/health | tee /tmp/health.json | grep -q '"status"'; then
-              cat /tmp/health.json
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Health check never became ready"; exit 1
+          curl -fsS http://localhost:9201/api/health | tee /tmp/health.json
+          python3 - <<'PY'
+          import json
+          h = json.load(open("/tmp/health.json"))
+          assert h["database"] == "connected", h
+          # The entrypoint runs `alembic upgrade head`, so a fresh container
+          # must report a migration revision — not "none".
+          assert h["migration"] not in ("none", "unknown"), h
+          print("health ok:", h["status"], "migration:", h["migration"])
+          PY
+
+      - name: Frontend is serving
+        run: curl -fsS http://localhost:9200 | head -c 200
 
       - name: Dump logs on failure
         if: failure()

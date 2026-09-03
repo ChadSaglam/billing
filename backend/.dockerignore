@@ -1,0 +1,17 @@
+venv
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+
+.git
+.gitignore
+*.log
+.DS_Store
+
+# Uploads are a mounted volume, not image content.
+uploads
+.env
+.env.local

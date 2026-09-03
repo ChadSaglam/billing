@@ -1,20 +1,22 @@
+# Ports come from .env so Docker and local development address the same
+# services on the same numbers. Defaults match .env.example.
 services:
   db:
     image: postgres:16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-chadev}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-chadev_billing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-billing}
     ports:
-      - "${DB_PORT:-5434}:5432"
+      - "${DB_PORT:-9202}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chadev} -d ${POSTGRES_DB:-chadev_billing}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chadev} -d ${POSTGRES_DB:-billing}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   backend:
     build: ./backend
@@ -22,22 +24,48 @@ services:
     env_file:
       - .env
     ports:
-      - "8001:8000"
+      - "${BACKEND_PORT:-9201}:8000"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-chadev}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-chadev_billing}
+      # Inside the network the database always answers on 5432, whatever
+      # port it is published on outside.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chadev}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-billing}
+      APP_ENV: ${APP_ENV:-development}
     volumes:
       - ./backend:/app
       - uploads:/app/uploads
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\""]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)\""]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 15s
+      retries: 10
+      start_period: 30s
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-9200}:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # The browser talks to the published backend port on the host, not to
+      # the compose service name.
+      VITE_API_URL: http://localhost:${BACKEND_PORT:-9201}
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5173').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
 volumes:
   pgdata:
   uploads:
+  frontend_node_modules:

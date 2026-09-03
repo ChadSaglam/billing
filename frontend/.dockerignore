@@ -1,0 +1,18 @@
+# node_modules holds platform-native binaries (esbuild, rollup). Copying the
+# host's macOS build into a Linux image overwrites the ones `npm ci` just
+# installed and vite dies on the wrong-architecture binary.
+node_modules
+dist
+.vite
+
+.git
+.gitignore
+*.log
+.DS_Store
+
+# Tests and local config are not needed to run the dev server.
+e2e
+playwright-report
+test-results
+.env
+.env.local
