@@ -10,7 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import get_tenant_id
+from app.auth import get_tenant_id, require_editor
 from app.database import get_db
 from app.models.document import Document
 from app.models.line_item import LineItem
@@ -199,12 +199,12 @@ def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
-@router.post("", response_model=DocumentRead, status_code=201)
+@router.post("", response_model=DocumentRead, status_code=201, dependencies=[Depends(require_editor)])
 def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc_data = data.model_dump(exclude={"line_items", "document_number"})
     doc_number = data.document_number
     if not doc_number:
-        doc_number = generate_document_number(db, data.document_type)
+        doc_number = generate_document_number(db, data.document_type, tenant_id)
 
     doc = Document(**doc_data, document_number=doc_number, tenant_id=tenant_id)
 
@@ -235,7 +235,7 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_
     db.commit()
     return _load_full(db, doc.id, tenant_id)
 
-@router.put("/{doc_id}", response_model=DocumentRead)
+@router.put("/{doc_id}", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
     update_data = data.model_dump(exclude_unset=True, exclude={"line_items"})
@@ -269,14 +269,14 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     db.commit()
     return _load_full(db, doc.id, tenant_id)
 
-@router.delete("/{doc_id}", status_code=204)
+@router.delete("/{doc_id}", status_code=204, dependencies=[Depends(require_editor)])
 def delete_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
     db.delete(doc)
     db.commit()
 
 # ── Status + Payment ──────────────────────────────────
-@router.patch("/{doc_id}/status", response_model=DocumentRead)
+@router.patch("/{doc_id}/status", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
     valid_statuses = {
@@ -303,7 +303,7 @@ def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depend
     db.commit()
     return _load_full(db, doc.id, tenant_id)
 
-@router.post("/{doc_id}/duplicate", response_model=DocumentRead)
+@router.post("/{doc_id}/duplicate", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def duplicate_document(
     doc_id: int,
     db: Session = Depends(get_db),
@@ -318,7 +318,7 @@ def duplicate_document(
     if not original:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    new_number = generate_document_number(db, original.document_type)
+    new_number = generate_document_number(db, original.document_type, tenant_id)
 
     clone = Document(
         tenant_id=tenant_id,
@@ -358,13 +358,13 @@ def duplicate_document(
     return clone
 
 # ── Convert Offerte → Rechnung ────────────────────────
-@router.post("/{doc_id}/convert", response_model=DocumentRead)
+@router.post("/{doc_id}/convert", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     offerte = _get_doc(db, doc_id, tenant_id, with_items=True)
     if offerte.document_type != "offerte":
         raise HTTPException(status_code=400, detail="Only Offerte documents can be converted")
 
-    doc_number = generate_document_number(db, "rechnung")
+    doc_number = generate_document_number(db, "rechnung", tenant_id)
     rechnung = Document(
         document_type="rechnung",
         document_number=doc_number,
@@ -404,7 +404,7 @@ def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db), tena
     return _load_full(db, rechnung.id, tenant_id)
 
 # ── Portal Token ──────────────────────────────────────
-@router.post("/{doc_id}/portal-token", response_model=DocumentRead)
+@router.post("/{doc_id}/portal-token", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def generate_portal_token(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
     doc.generate_portal_token()
@@ -430,31 +430,31 @@ def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
     )
 
 @router.get("/{doc_id}/preview")
-def preview_pdf(doc_id: int, template: str = Query("modern"), token: str = Query(None), db: Session = Depends(get_db)):
-    from jose import JWTError
-    from jose import jwt as jose_jwt
+def preview_pdf(
+    doc_id: int,
+    template: str = Query("modern"),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    """Render a document with a chosen template, without persisting the choice.
 
-    from app.config import settings as app_settings
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jose_jwt.decode(token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
-        tenant_id = payload["tid"]
-    except (JWTError, KeyError):
-        raise HTTPException(status_code=401, detail="Invalid token") from None
-
+    Authentication is a normal Authorization header. It previously accepted
+    the JWT as a `?token=` query parameter — which lands in access logs,
+    browser history and Referer headers — and derived the tenant from the
+    token's `tid` claim instead of the database (R-06).
+    """
     doc = _load_full(db, doc_id, tenant_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
-    if not settings:
-        raise HTTPException(status_code=500, detail="Company settings not configured")
+    settings = _get_settings(db, tenant_id)
 
     original = settings.pdf_template
     settings.pdf_template = template
-    pdf_buffer = generate_invoice_pdf(doc, settings)
-    settings.pdf_template = original
+    try:
+        pdf_buffer = generate_invoice_pdf(doc, settings)
+    finally:
+        settings.pdf_template = original
+        db.expire(settings)
     pdf_buffer.seek(0)
     return StreamingResponse(
         BytesIO(pdf_buffer.read()),
@@ -462,8 +462,7 @@ def preview_pdf(doc_id: int, template: str = Query("modern"), token: str = Query
         headers={"Content-Disposition": "inline"},
     )
 
-# ── Email ─────────────────────────────────────────────
-@router.post("/{doc_id}/send-email")
+@router.post("/{doc_id}/send-email", dependencies=[Depends(require_editor)])
 def send_document_email_endpoint(
     doc_id: int,
     background_tasks: BackgroundTasks,
@@ -504,7 +503,7 @@ def send_document_email_endpoint(
 
     return {"message": "Email queued successfully", "recipient": recipient_email}
 # ── Bulk Actions ──────────────────────────────────────
-@router.post("/bulk/status")
+@router.post("/bulk/status", dependencies=[Depends(require_editor)])
 def bulk_update_status(data: BulkStatusRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = db.query(Document).filter(Document.id.in_(data.document_ids), Document.tenant_id == tenant_id).all()
     if not docs:
@@ -528,7 +527,7 @@ def bulk_update_status(data: BulkStatusRequest, db: Session = Depends(get_db), t
     db.commit()
     return {"updated": updated, "total": len(data.document_ids)}
 
-@router.post("/bulk/send-email")
+@router.post("/bulk/send-email", dependencies=[Depends(require_editor)])
 def bulk_send_email(data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = (
         db.query(Document)
@@ -566,7 +565,7 @@ def bulk_send_email(data: BulkActionRequest, db: Session = Depends(get_db), tena
     db.commit()
     return {"sent": sent, "errors": errors}
 
-@router.post("/bulk/pdf-zip")
+@router.post("/bulk/pdf-zip", dependencies=[Depends(require_editor)])
 def bulk_download_pdf_zip(data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = (
         db.query(Document)

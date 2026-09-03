@@ -67,3 +67,33 @@ def get_current_user(
 
 def get_tenant_id(user: User = Depends(get_current_user)) -> int:
     return user.tenant_id
+
+
+# ── Role-based access control (R-07) ────────────────────────────────
+# viewer  read only
+# editor  read + write business data (clients, documents, services, settings)
+# admin   everything, including user management
+ROLE_RANK = {"viewer": 0, "editor": 1, "admin": 2}
+
+
+def require_role(minimum: str):
+    """Dependency factory: reject users below `minimum`.
+
+    Use on every state-changing endpoint. Read endpoints stay open to all
+    authenticated roles.
+    """
+    required = ROLE_RANK[minimum]
+
+    def _check(user: User = Depends(get_current_user)) -> User:
+        if ROLE_RANK.get(user.role, -1) < required:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires {minimum} role or higher",
+            )
+        return user
+
+    return _check
+
+
+require_editor = require_role("editor")
+require_admin = require_role("admin")

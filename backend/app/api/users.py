@@ -3,7 +3,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user, get_tenant_id, hash_password
+from app.auth import get_tenant_id, hash_password, require_admin
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import InviteRequest, InviteResponse, UserRead, UserUpdate
@@ -11,17 +11,11 @@ from app.schemas.user import InviteRequest, InviteResponse, UserRead, UserUpdate
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
-def _require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
-
-
 @router.get("", response_model=list[UserRead])
 def list_users(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _admin: User = Depends(_require_admin),
+    _admin: User = Depends(require_admin),
 ):
     return (
         db.query(User)
@@ -36,7 +30,7 @@ def invite_user(
     data: InviteRequest,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _admin: User = Depends(_require_admin),
+    _admin: User = Depends(require_admin),
 ):
     if data.role not in ("admin", "editor", "viewer"):
         raise HTTPException(status_code=400, detail="Role must be admin, editor, or viewer")
@@ -68,7 +62,7 @@ def update_user(
     data: UserUpdate,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    admin: User = Depends(_require_admin),
+    admin: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
     if not user:
@@ -95,7 +89,7 @@ def remove_user(
     user_id: int,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    admin: User = Depends(_require_admin),
+    admin: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
     if not user:

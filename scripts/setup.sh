@@ -1,113 +1,90 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────
-# setup.sh — First-time project setup for billing
+# setup.sh — first-time setup
+#
+#   ./scripts/setup.sh          # everything: venv, npm, docker images
+#   ./scripts/setup.sh local    # venv + npm only (no docker)
+#   ./scripts/setup.sh docker   # docker images + npm only (no venv)
 # ─────────────────────────────────────────────────────────
-set -euo pipefail
+set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-cd "$PROJECT_DIR"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-CYAN="\033[36m"; GREEN="\033[32m"; YELLOW="\033[33m"; RED="\033[31m"; RESET="\033[0m"; BOLD="\033[1m"
+MODE="${1:-all}"
+[[ "$MODE" =~ ^(all|local|docker)$ ]] || die "Unknown mode '$MODE' — use: all | local | docker"
 
-log_ok()    { echo -e "  ${GREEN}✓${RESET} $1"; }
-log_warn()  { echo -e "  ${YELLOW}⊘${RESET} $1"; }
-log_error() { echo -e "  ${RED}✗${RESET} $1"; }
-
-echo -e "${BOLD}🧾 billing — Setup${RESET}"
+echo -e "${BOLD}🧾 Setup (${MODE})${RESET}"
 echo ""
 
 # ── Prerequisites ──────────────────────────────────────
-echo -e "${BOLD}Checking prerequisites...${RESET}"
-
+log_info "Prerequisites"
 require() {
-  local cmd="$1" install_hint="$2"
-  if command -v "$cmd" &> /dev/null; then
-    log_ok "$cmd $(command "$cmd" --version 2>/dev/null | head -1)"
-  else
-    log_error "$cmd not found — $install_hint"
-    exit 1
-  fi
+  if have "$1"; then log_ok "$1 $(command "$1" --version 2>/dev/null | head -1 | cut -c1-40)"
+  else die "$1 not found — $2"; fi
 }
-
-require docker "https://docker.com"
 require node "https://nodejs.org (v20+)"
-require npm "installed with Node.js"
+require npm "ships with Node.js"
+[[ "$MODE" != "docker" ]] && { require python3 "Python 3.12+"; have psql || log_warn "psql not found — local DB checks will be skipped"; }
+[[ "$MODE" != "local"  ]] && require docker "https://docker.com"
 echo ""
 
 # ── .env ───────────────────────────────────────────────
-echo -e "${BOLD}Environment...${RESET}"
-if [[ ! -f ".env" ]]; then
-  if [[ -f ".env.example" ]]; then
-    cp .env.example .env
-    log_warn ".env created from .env.example — review and fill in secrets"
-  else
-    log_error "No .env or .env.example found"
-    exit 1
-  fi
+log_info "Environment"
+cd "$PROJECT_DIR"
+if [[ ! -f .env ]]; then
+  [[ -f .env.example ]] || die "no .env and no .env.example"
+  cp .env.example .env
+  log_warn ".env created from .env.example — fill in the secrets before continuing"
 else
   log_ok ".env exists"
 fi
+load_env
+init_config
 echo ""
 
 # ── Backend ────────────────────────────────────────────
-echo -e "${BOLD}Setting up backend...${RESET}"
-cd backend
-
-if [[ ! -d "venv" ]]; then
-  if command -v python3 &> /dev/null; then
-    python3 -m venv venv
-    log_ok "Virtual environment created"
+if [[ "$MODE" != "docker" ]]; then
+  log_info "Backend"
+  [[ -d "$VENV_DIR" ]] || { python3 -m venv "$VENV_DIR"; log_ok "venv created"; }
+  # shellcheck disable=SC1091
+  source "$VENV_DIR/bin/activate"
+  python -m pip install -q --upgrade pip
+  if [[ -f "$BACKEND_DIR/requirements-dev.txt" ]]; then
+    pip install -q -r "$BACKEND_DIR/requirements-dev.txt" && log_ok "dependencies + dev tools installed"
   else
-    log_warn "No local python3 — will use Docker only"
+    pip install -q -r "$BACKEND_DIR/requirements.txt" && log_ok "dependencies installed"
   fi
+  mkdir -p "$BACKEND_DIR/uploads/logos" && log_ok "uploads/ ready"
+  deactivate
+  echo ""
 fi
-
-if [[ -d "venv" ]]; then
-  source venv/bin/activate
-  pip install -q -r requirements.txt 2>/dev/null || {
-    log_warn "Some pip packages failed (OK — backend runs in Docker with Python 3.12)"
-  }
-fi
-
-mkdir -p uploads
-log_ok "uploads directory ready"
-
-cd "$PROJECT_DIR"
-echo ""
 
 # ── Frontend ───────────────────────────────────────────
-echo -e "${BOLD}Setting up frontend...${RESET}"
-cd frontend
-npm install --silent
-log_ok "Node dependencies installed"
-cd "$PROJECT_DIR"
+log_info "Frontend"
+(cd "$FRONTEND_DIR" && npm install --silent) && log_ok "node dependencies installed"
 echo ""
 
 # ── Docker ─────────────────────────────────────────────
-echo -e "${BOLD}Building Docker images...${RESET}"
-docker compose build
-log_ok "Docker images built"
-echo ""
+if [[ "$MODE" != "local" ]]; then
+  log_info "Docker images"
+  $COMPOSE build && log_ok "images built"
+  echo ""
+fi
 
-# ── Port Check ─────────────────────────────────────────
-echo -e "${BOLD}Checking ports...${RESET}"
-for port in 5434 8001 5173; do
-  if lsof -i :"$port" -sTCP:LISTEN > /dev/null 2>&1; then
-    proc_pid=$(lsof -i :"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
-    proc_name=$(ps -p "$proc_pid" -o comm= 2>/dev/null || echo "unknown")
-    log_warn "Port $port in use by $proc_name (PID $proc_pid)"
+# ── Ports ──────────────────────────────────────────────
+log_info "Ports"
+for entry in "$FRONTEND_PORT:frontend" "$BACKEND_PORT:backend" "$DB_PORT:database"; do
+  port="${entry%%:*}"; label="${entry##*:}"
+  if port_in_use "$port"; then
+    pid=$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    log_warn "port $port ($label) in use by $(ps -p "$pid" -o comm= 2>/dev/null || echo unknown)"
   else
-    log_ok "Port $port available"
+    log_ok "port $port ($label) free"
   fi
 done
 
 echo ""
-echo -e "${GREEN}${BOLD}✓ Setup complete!${RESET}"
-echo ""
-echo "Start services:"
-echo "  ./scripts/dev.sh"
-echo ""
-echo "Verify (in another terminal):"
-echo "  ./scripts/test.sh"
-echo "  ./scripts/project-overview.sh"
+echo -e "${GREEN}${BOLD}Setup complete${RESET}"
+echo "  Start:    ./scripts/dev.sh"
+echo "  Verify:   ./scripts/test.sh"
+echo "  Overview: ./scripts/project-overview.sh"

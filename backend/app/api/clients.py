@@ -3,7 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import get_tenant_id
+from app.auth import get_tenant_id, require_editor
 from app.database import get_db
 from app.models.client import Client
 from app.schemas.client import ClientCreate, ClientRead, ClientUpdate
@@ -39,7 +39,7 @@ def get_client(client_id: int, db: Session = Depends(get_db), tenant_id: int = D
     return client
 
 
-@router.post("", response_model=ClientRead, status_code=201)
+@router.post("", response_model=ClientRead, status_code=201, dependencies=[Depends(require_editor)])
 def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     existing = db.query(Client).filter(
         Client.tenant_id == tenant_id,
@@ -59,7 +59,7 @@ def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: 
     return client
 
 
-@router.put("/{client_id}", response_model=ClientRead)
+@router.put("/{client_id}", response_model=ClientRead, dependencies=[Depends(require_editor)])
 def update_client(client_id: int, data: ClientUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     client = db.query(Client).filter(Client.id == client_id, Client.tenant_id == tenant_id).first()
     if not client:
@@ -71,7 +71,7 @@ def update_client(client_id: int, data: ClientUpdate, db: Session = Depends(get_
     return client
 
 
-@router.delete("/{client_id}", status_code=204)
+@router.delete("/{client_id}", status_code=204, dependencies=[Depends(require_editor)])
 def delete_client(client_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     client = db.query(Client).filter(Client.id == client_id, Client.tenant_id == tenant_id).first()
     if not client:

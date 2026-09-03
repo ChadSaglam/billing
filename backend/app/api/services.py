@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import get_tenant_id
+from app.auth import get_tenant_id, require_editor
 from app.database import get_db
 from app.models.service_template import ServiceTemplate
 from app.schemas.service_template import (
@@ -28,7 +28,7 @@ def list_services(
     return q.order_by(ServiceTemplate.category, ServiceTemplate.sort_order, ServiceTemplate.name).all()
 
 
-@router.post("", response_model=ServiceTemplateRead, status_code=201)
+@router.post("", response_model=ServiceTemplateRead, status_code=201, dependencies=[Depends(require_editor)])
 def create_service(payload: ServiceTemplateCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     svc = ServiceTemplate(**payload.model_dump(), tenant_id=tenant_id)
     db.add(svc)
@@ -37,7 +37,7 @@ def create_service(payload: ServiceTemplateCreate, db: Session = Depends(get_db)
     return svc
 
 
-@router.put("/{service_id}", response_model=ServiceTemplateRead)
+@router.put("/{service_id}", response_model=ServiceTemplateRead, dependencies=[Depends(require_editor)])
 def update_service(
     service_id: int,
     payload: ServiceTemplateUpdate,
@@ -54,7 +54,7 @@ def update_service(
     return svc
 
 
-@router.delete("/{service_id}", status_code=204)
+@router.delete("/{service_id}", status_code=204, dependencies=[Depends(require_editor)])
 def delete_service(service_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     svc = db.query(ServiceTemplate).filter(ServiceTemplate.id == service_id, ServiceTemplate.tenant_id == tenant_id).first()
     if not svc:

@@ -142,6 +142,22 @@ export const updateDocumentStatus = async (id: number, status: string): Promise<
   return data;
 };
 
+/**
+ * Fetch a document preview as an object URL.
+ *
+ * The preview used to be loaded by putting the JWT in the iframe's query
+ * string, which leaks the token into access logs, browser history and
+ * Referer headers. Going through the axios client sends it as a header
+ * instead; the caller must revoke the returned URL when done.
+ */
+export async function fetchDocumentPreviewUrl(docId: number, template?: string): Promise<string> {
+  const { data } = await api.get(`/api/documents/${docId}/preview`, {
+    params: template ? { template } : undefined,
+    responseType: 'blob',
+  });
+  return URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+}
+
 export async function downloadDocumentPdf(docId: number, docNumber: string, docType: string): Promise<void> {
   const res = await api.get(`/api/documents/${docId}/pdf`, { responseType: 'blob' });
   const blob = new Blob([res.data], { type: 'application/pdf' });

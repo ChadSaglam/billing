@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api import auth, clients, dashboard, documents, portal, services, settings, users
 from app.auth import get_current_user
 from app.config import settings as app_settings
-from app.database import Base, SessionLocal, engine, get_db
+from app.database import SessionLocal, get_db
 from app.limiter import limiter
 from app.models.user import User
 
@@ -47,7 +47,8 @@ async def _background_jobs():
 async def lifespan(app: FastAPI):
     import asyncio
 
-    Base.metadata.create_all(bind=engine)
+    # Schema is owned by Alembic only — `alembic upgrade head`.
+    # create_all() here silently diverged from the migrations (R-10).
     db = SessionLocal()
 
     try:
@@ -129,9 +130,12 @@ def health(db: Session = Depends(get_db)):
 
     return health
 
-@app.post("/api/seed")
-def seed_data(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    from app.seed import run_seed
+if app_settings.APP_ENV != "production":
 
-    result = run_seed(db, user.tenant_id)
-    return {"message": "Seed data created", **result}
+    @app.post("/api/seed")
+    def seed_data(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+        """Demo data. Not registered when APP_ENV=production (R-08)."""
+        from app.seed import run_seed
+
+        result = run_seed(db, user.tenant_id)
+        return {"message": "Seed data created", **result}

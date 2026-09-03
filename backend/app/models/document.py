@@ -2,7 +2,17 @@ import datetime as dt
 import secrets
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -15,12 +25,14 @@ class Document(Base):
             "document_type IN ('offerte', 'rechnung')",
             name="ck_document_type",
         ),
+        # Document numbers are unique per tenant, not globally (R-04).
+        UniqueConstraint("tenant_id", "document_number", name="uq_documents_tenant_document_number"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False, index=True)
     document_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    document_number: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    document_number: Mapped[str] = mapped_column(String(20), nullable=False)
     client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), nullable=False)
     date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     due_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)

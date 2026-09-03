@@ -36,7 +36,7 @@ def process_recurring_invoices(db: Session) -> int:
 
         new_date = doc.next_recurrence_date
         new_due = new_date + dt.timedelta(days=doc.payment_terms_days)
-        doc_number = generate_document_number(db, "rechnung")
+        doc_number = generate_document_number(db, "rechnung", doc.tenant_id)
 
         new_doc = Document(
             document_type="rechnung",

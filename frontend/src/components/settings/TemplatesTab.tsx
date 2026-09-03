@@ -3,8 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Eye, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const API = import.meta.env.VITE_API_URL;
+import { fetchDocumentPreviewUrl, getDocuments } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 const templates = [
   {
@@ -26,24 +26,24 @@ interface Props {
 
 export function TemplatesTab({ value, onChange }: Props) {
   const [, setPreviewTemplate] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const handlePreview = (templateId: string) => {
-    const token = localStorage.getItem('auth_token');
-    const url = `${API}/api/documents?document_type=rechnung`;
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((docs) => {
-        const docId = docs[0]?.id;
-        if (!docId) {
-          alert('Keine Rechnung vorhanden für Vorschau');
-          return;
-        }
-        setPreviewTemplate(templateId);
-        window.open(
-            `${API}/api/documents/${docId}/preview?template=${templateId}&token=${token}`,
-            '_blank'
-        );
-      });
+  const handlePreview = async (templateId: string) => {
+    try {
+      const docs = await getDocuments({ type: 'rechnung' });
+      const docId = docs[0]?.id;
+      if (!docId) {
+        toast({ title: 'Keine Rechnung vorhanden für Vorschau', variant: 'destructive' });
+        return;
+      }
+      setPreviewTemplate(templateId);
+      // Object URL: the token travels in the Authorization header, not the URL.
+      const url = await fetchDocumentPreviewUrl(docId, templateId);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast({ title: 'Vorschau konnte nicht geladen werden', variant: 'destructive' });
+    }
   };
 
   return (
