@@ -18,13 +18,7 @@ def _doc_payload(client_id):
         "client_id": client_id,
         "date": "2026-01-15",
         "line_items": [
-            {
-                "position": 1,
-                "description": "Beratung",
-                "quantity": "1",
-                "unit_price": "100.00",
-                "total_price": "100.00",
-            }
+            {"position": 1, "description": "Beratung", "quantity": "1", "unit_price": "100.00"}
         ],
     }
 

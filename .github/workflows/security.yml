@@ -36,12 +36,15 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pip-audit==2.7.3
-      # Advisory for now: a new CVE in a transitive dependency must not block
-      # unrelated PRs. The weekly scheduled run is the signal to act on.
-      # Tighten to blocking once the backlog is at zero (R-39).
+      # Blocking. The backlog was cleared in R-39.
+      #
+      # PYSEC-2026-1325 (ecdsa) is ignored: it is a transitive dependency of
+      # python-jose with no fixed release, and the advisory concerns ECDSA
+      # signing. This app signs every token with HS256, so the vulnerable
+      # code path is never reached. Re-check when python-jose drops ecdsa or
+      # a fix ships.
       - name: pip-audit
-        run: pip-audit -r backend/requirements.txt
-        continue-on-error: true
+        run: pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2026-1325
 
   node-deps:
     name: npm dependency audit
@@ -57,10 +60,10 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      # Advisory for now — see the note on pip-audit above (R-39).
+      # Blocking at high. Two moderate react-router advisories remain and
+      # need a v6 -> v7 major upgrade, tracked as R-42.
       - name: npm audit (high/critical)
         run: npm audit --audit-level=high
-        continue-on-error: true
 
   # CodeQL is NOT defined here on purpose.
   #

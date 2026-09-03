@@ -101,7 +101,7 @@ export default function DocumentForm() {
         quantity: Number(li.quantity),
         unit: li.unit,
         unit_price: Number(li.unit_price),
-        total_price: Number(li.quantity) * Number(li.unit_price),
+        // total_price is computed by the server from quantity x unit_price.
         vat_rate: li.vat_rate,
       })),
     };

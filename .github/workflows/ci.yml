@@ -174,7 +174,21 @@ jobs:
         run: docker compose config >/dev/null
 
       - name: Boot the stack
-        run: docker compose up -d --wait --wait-timeout 300
+        id: boot
+        run: |
+          set +e
+          docker compose up -d --wait --wait-timeout 300
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "::group::backend logs"; docker compose logs backend --no-color; echo "::endgroup::"
+            echo "::group::db logs";      docker compose logs db --no-color | tail -30; echo "::endgroup::"
+            echo "::group::frontend logs";docker compose logs frontend --no-color; echo "::endgroup::"
+            echo "::group::container state"; docker compose ps -a; echo "::endgroup::"
+            echo "::group::backend inspect"
+            docker inspect --format '{{json .State.Health}}' "$(docker compose ps -q backend)" | python3 -m json.tool
+            echo "::endgroup::"
+          fi
+          exit $status
 
       - name: Backend is healthy and migrated
         run: |

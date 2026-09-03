@@ -12,18 +12,24 @@ class LineItemBase(BaseModel):
     description: str
     quantity: Decimal = Decimal("1")
     unit_price: Decimal
-    total_price: Decimal
     vat_rate: Decimal = Decimal("8.10")
     unit: str = "Stunde"
 
 
 class LineItemCreate(LineItemBase):
-    pass
+    """Input only.
+
+    `total_price` is deliberately absent: it is quantity x unit_price and the
+    server computes it. Accepting it from the client meant a crafted request
+    could book CHF 500 of work as CHF 1, and the document subtotal, the VAT
+    and the QR-bill amount all inherited the forged figure (R-31).
+    """
 
 
 class LineItemRead(LineItemBase):
     id: int
     document_id: int
+    total_price: Decimal
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -57,11 +63,10 @@ class DocumentUpdate(BaseModel):
     due_date: DateType | None = None
     payment_terms_days: int | None = None
     status: str | None = None
-    subtotal: Decimal | None = None
+    # subtotal, discount_amount, vat_amount and total are derived from the
+    # line items and the discount percentage. They are not accepted here —
+    # otherwise a client could set a total that contradicts its own lines.
     discount_percent: Decimal | None = None
-    discount_amount: Decimal | None = None
-    vat_amount: Decimal | None = None
-    total: Decimal | None = None
     currency: str | None = None
     notes: str | None = None
     recurrence: str | None = None

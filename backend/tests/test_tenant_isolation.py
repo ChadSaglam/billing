@@ -52,15 +52,7 @@ def test_document_is_not_readable_cross_tenant(client, two_tenants):
             "client_id": client_id,
             "date": "2026-01-15",
             "line_items": [
-                {
-                    "position": 1,
-                    "description": "Beratung",
-                    "quantity": "2",
-                    "unit_price": "250.00",
-                    # NOTE: the API requires the client to send total_price and
-                    # never verifies it against quantity * unit_price — see R-31.
-                    "total_price": "500.00",
-                }
+                {"position": 1, "description": "Beratung", "quantity": "2", "unit_price": "250.00"}
             ],
         },
         headers=a["headers"],

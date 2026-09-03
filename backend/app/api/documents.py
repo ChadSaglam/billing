@@ -30,6 +30,20 @@ from app.services.sanitizer import sanitize_text
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
+def _build_line_item(item_data, document_id: int) -> LineItem:
+    """Create a LineItem with a server-computed total.
+
+    quantity x unit_price is the single source of truth; the client does not
+    get to state the line total (R-31).
+    """
+    fields = item_data.model_dump()
+    fields["description"] = sanitize_text(fields.get("description", ""))
+    fields["total_price"] = (
+        Decimal(fields["quantity"]) * Decimal(fields["unit_price"])
+    ).quantize(Decimal("0.01"))
+    return LineItem(**fields, document_id=document_id)
+
+
 def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal, Decimal, Decimal, Decimal]:
     subtotal = sum(item.total_price for item in line_items)
     discount_amount = (subtotal * discount_percent / Decimal("100")).quantize(Decimal("0.01"))
@@ -219,10 +233,7 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_
     db.flush()
 
     for item_data in data.line_items:
-        item_dict = item_data.model_dump()
-        item_dict["description"] = sanitize_text(item_dict.get("description", ""))
-        item = LineItem(**item_dict, document_id=doc.id)
-        db.add(item)
+        db.add(_build_line_item(item_data, doc.id))
 
     db.flush()
     items = db.query(LineItem).filter(LineItem.document_id == doc.id).all()
@@ -245,10 +256,7 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     if data.line_items is not None:
         db.query(LineItem).filter(LineItem.document_id == doc_id).delete()
         for item_data in data.line_items:
-            item_dict = item_data.model_dump()
-            item_dict["description"] = sanitize_text(item_dict.get("description", ""))
-            item = LineItem(**item_dict, document_id=doc_id)
-            db.add(item)
+            db.add(_build_line_item(item_data, doc_id))
         db.flush()
         items = db.query(LineItem).filter(LineItem.document_id == doc_id).all()
         subtotal, discount_amount, vat_amount, total = _recalc_totals(items, doc.discount_percent)

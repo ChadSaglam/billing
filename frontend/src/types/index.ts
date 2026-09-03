@@ -104,7 +104,7 @@ export interface CreateDocumentPayload {
     quantity: number;
     unit: string;
     unit_price: number;
-    total_price: number;
+    // No total_price: the server derives it from quantity x unit_price.
     vat_rate: number;
   }[];
 }
