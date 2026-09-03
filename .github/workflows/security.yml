@@ -80,17 +80,52 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
+
       - name: Build backend image
         run: docker build -t billing-backend:scan ./backend
-      - uses: aquasecurity/trivy-action@master
+
+      # Trivy's vulnerability DB is pulled from ghcr.io and is rate limited
+      # for anonymous clients. Authenticating with the workflow token avoids
+      # the TOOMANYREQUESTS failures.
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Human-readable findings, always visible in the job log. exit-code 0
+      # keeps a newly published CVE from blocking unrelated PRs (R-39).
+      - name: Scan image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: billing-backend:scan
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+        env:
+          TRIVY_SKIP_DB_UPDATE: "false"
+
+      - name: Scan image (SARIF)
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: billing-backend:scan
           format: sarif
           output: trivy-backend.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-      - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+          exit-code: "0"
+
+      # SARIF upload only works where GitHub code scanning accepts results:
+      # a public repo, or a private repo with GitHub Advanced Security. On a
+      # private repo without GHAS the API returns "Resource not accessible by
+      # integration" and fails the job. Findings are already printed by the
+      # table step above, so this is skipped rather than soft-failed.
+      - name: Upload SARIF
+        if: ${{ !github.event.repository.private }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-backend.sarif
           category: trivy-backend
