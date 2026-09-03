@@ -9,6 +9,8 @@ import pathlib
 import uuid
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -31,7 +33,7 @@ def _load_dotenv(path: pathlib.Path) -> None:
 _load_dotenv(_ROOT / ".env")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
 
-from app.database import Base, get_db  # noqa: E402
+from app.database import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
 TEST_DB_URL = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
@@ -42,7 +44,12 @@ def engine():
     if not TEST_DB_URL:
         pytest.skip("TEST_DATABASE_URL / DATABASE_URL not set")
     eng = create_engine(TEST_DB_URL)
-    Base.metadata.create_all(bind=eng)
+    # create_all() would hide a broken migration chain — which is exactly the
+    # bug that shipped. Build the schema the way production does.
+    alembic_cfg = Config(str(_ROOT / "backend" / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(_ROOT / "backend" / "alembic"))
+    alembic_cfg.set_main_option("sqlalchemy.url", TEST_DB_URL)
+    command.upgrade(alembic_cfg, "head")
     yield eng
     eng.dispose()
 

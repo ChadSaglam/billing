@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fetchDocumentPreviewUrl, getDocuments } from '@/lib/api';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 const templates = [
   {
@@ -26,7 +26,6 @@ interface Props {
 
 export function TemplatesTab({ value, onChange }: Props) {
   const [, setPreviewTemplate] = useState<string | null>(null);
-  const { toast } = useToast();
 
   const handlePreview = async (templateId: string) => {
     try {
