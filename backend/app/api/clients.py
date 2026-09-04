@@ -6,14 +6,16 @@ from sqlalchemy.orm import Session
 from app.auth import get_tenant_id, require_editor
 from app.database import get_db
 from app.models.client import Client
-from app.schemas.client import ClientCreate, ClientRead, ClientUpdate
+from app.schemas.client import ClientCreate, ClientPage, ClientRead, ClientUpdate
 
 router = APIRouter(prefix="/api/clients", tags=["clients"])
 
 
-@router.get("", response_model=list[ClientRead])
+@router.get("", response_model=list[ClientRead] | ClientPage)
 def list_clients(
     search: str | None = Query(None),
+    page: int | None = Query(None, ge=1),
+    page_size: int = Query(25, ge=1, le=200),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
@@ -28,7 +30,17 @@ def list_clients(
                 Client.city.ilike(pattern),
             )
         )
-    return query.order_by(Client.company_name).all()
+    query = query.order_by(Client.company_name)
+
+    # Backwards compatibility: without `page` the endpoint returns the plain
+    # list it always did. New consumers pass ?page=1&page_size=… and get the
+    # paginated envelope instead of the full table (R-13).
+    if page is None:
+        return query.all()
+
+    total = query.count()
+    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    return ClientPage(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/{client_id}", response_model=ClientRead)

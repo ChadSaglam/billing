@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, FileText, Mail, CheckCircle, Download, ArrowUpRight } from 'lucide-react';
-import { getDocuments, bulkUpdateStatus, bulkSendEmail, bulkDownloadPdfZip } from '@/lib/api';
+import { getDocumentsPage, bulkUpdateStatus, bulkSendEmail, bulkDownloadPdfZip } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/select';
 import { PageHeader, StatusBadge, EmptyState, TableSkeleton } from '@/components/shared';
 
+const PAGE_SIZE = 25;
+
 export default function Documents() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -25,14 +27,25 @@ export default function Documents() {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'all' | 'offerte' | 'rechnung'>('all');
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [page, setPage] = useState(1);
 
   const typeParam = tab === 'all' ? undefined : tab;
   const statusParam = statusFilter === 'all' ? undefined : statusFilter;
 
-  const { data: documents, isLoading } = useQuery({
-    queryKey: queryKeys.documents.list({ type: typeParam, status: statusParam, search }),
-    queryFn: () => getDocuments({ type: typeParam, status: statusParam, search: search || undefined }),
+  // Page is appended to the key the factory returns so every page gets its
+  // own cache entry (R-13).
+  const { data, isLoading } = useQuery({
+    queryKey: [...queryKeys.documents.list({ type: typeParam, status: statusParam, search }), page],
+    queryFn: () =>
+      getDocumentsPage({
+        type: typeParam,
+        status: statusParam,
+        search: search || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      }),
   });
+  const documents = data?.items;
 
   const bulkStatusMut = useMutation({
     mutationFn: (status: string) => bulkUpdateStatus({ document_ids: [...selected], status }),
@@ -103,7 +116,7 @@ export default function Documents() {
         {tabs.map((t) => (
           <button
             key={t.value}
-            onClick={() => { setTab(t.value); setSelected(new Set()); }}
+            onClick={() => { setTab(t.value); setSelected(new Set()); setPage(1); }}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               tab === t.value ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -120,11 +133,20 @@ export default function Documents() {
           <Input
             placeholder="Search documents..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -272,6 +294,34 @@ export default function Documents() {
               </Card>
             ))}
           </div>
+
+          {/* Pagination footer (R-13) */}
+          {data && data.total > 0 && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span>
+                {data.total} {data.total === 1 ? 'document' : 'documents'} · page {data.page} of{' '}
+                {Math.max(1, Math.ceil(data.total / data.page_size))}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page * data.page_size >= data.total}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

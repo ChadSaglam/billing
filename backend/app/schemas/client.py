@@ -39,3 +39,12 @@ class ClientRead(ClientBase):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ClientPage(BaseModel):
+    """Paginated envelope for the list endpoint (R-13)."""
+
+    items: list[ClientRead]
+    total: int
+    page: int
+    page_size: int

@@ -18,11 +18,15 @@ class SettingsBase(BaseModel):
     website: str
     default_hourly_rate: Decimal
     default_payment_terms_days: int
+    # Billing locale defaults (R-12)
+    default_vat_rate: Decimal
+    default_currency: str
     logo_url: str | None = None
     next_invoice_number: int
     next_offerte_number: int
     pdf_template: str
     onboarding_completed: bool
+
 
 class SettingsRead(SettingsBase):
     id: int
@@ -44,6 +48,8 @@ class SettingsUpdate(BaseModel):
     website: str | None = None
     default_hourly_rate: Decimal | None = None
     default_payment_terms_days: int | None = None
+    default_vat_rate: Decimal | None = None
+    default_currency: str | None = None
     logo_url: str | None = None
     next_invoice_number: int | None = None
     next_offerte_number: int | None = None

@@ -23,6 +23,10 @@ class LineItemCreate(LineItemBase):
     server computes it. Accepting it from the client meant a crafted request
     could book CHF 500 of work as CHF 1, and the document subtotal, the VAT
     and the QR-bill amount all inherited the forged figure (R-31).
+
+    `vat_rate` keeps a schema default for backwards compatibility, but the
+    server replaces it with the tenant's default_vat_rate whenever the
+    client did not send the field explicitly (R-12).
     """
 
 
@@ -111,6 +115,15 @@ class DocumentListRead(BaseModel):
     created_at: datetime
     client: ClientRead | None = None
     model_config = {"from_attributes": True}
+
+
+class DocumentPage(BaseModel):
+    """Paginated envelope for the list endpoint (R-13)."""
+
+    items: list[DocumentListRead]
+    total: int
+    page: int
+    page_size: int
 
 
 # Portal (public, no auth)
