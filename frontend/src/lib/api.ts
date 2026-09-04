@@ -74,10 +74,33 @@ api.interceptors.response.use(
   }
 );
 
+// ── Pagination (R-13) ──────────────────────────────────
+// The list endpoints return a plain array when no `page` param is sent
+// (legacy behaviour, still used by comboboxes etc.) and this envelope when
+// they are called with page/page_size. New code should use the paginated
+// helpers.
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 // ── Clients ──────────────────────────────────────────────
 export const getClients = async (search?: string): Promise<Client[]> => {
   const params = search ? { search } : {};
   const { data } = await api.get<Client[]>('/api/clients', { params });
+  return data;
+};
+
+export const getClientsPage = async (
+  search: string | undefined,
+  page: number,
+  pageSize = 25
+): Promise<Page<Client>> => {
+  const params: Record<string, string | number> = { page, page_size: pageSize };
+  if (search) params.search = search;
+  const { data } = await api.get<Page<Client>>('/api/clients', { params });
   return data;
 };
 
@@ -110,6 +133,20 @@ export const getDocuments = async (params?: {
   const { type, ...rest } = params || {};
   const queryParams = { ...rest, document_type: type };
   const { data } = await api.get<Document[]>('/api/documents', { params: queryParams });
+  return data;
+};
+
+export const getDocumentsPage = async (params?: {
+  type?: string;
+  status?: string;
+  client_id?: number;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<Page<Document>> => {
+  const { type, pageSize, ...rest } = params || {};
+  const queryParams = { ...rest, document_type: type, page_size: pageSize ?? 25 };
+  const { data } = await api.get<Page<Document>>('/api/documents', { params: queryParams });
   return data;
 };
 
@@ -240,6 +277,9 @@ export interface AuthUser {
   role: string;
   tenant_id: number;
   tenant_name: string;
+  // Subscription state (R-11); backend always sends these now.
+  subscription_plan?: string;
+  trial_ends_at?: string | null;
 }
 
 export const login = async (payload: LoginPayload): Promise<AuthResponse> => {

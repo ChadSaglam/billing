@@ -33,6 +33,10 @@ class CompanySettings(Base):
     website: Mapped[str] = mapped_column(String(255), default="")
     default_hourly_rate: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
     default_payment_terms_days: Mapped[int] = mapped_column(default=30)
+    # Billing locale defaults (R-12). These seed new line items / documents;
+    # the Swiss values are defaults of last resort, not constants.
+    default_vat_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("8.10"))
+    default_currency: Mapped[str] = mapped_column(String(3), default="CHF")
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     next_invoice_number: Mapped[int] = mapped_column(default=1)
     next_offerte_number: Mapped[int] = mapped_column(default=1)

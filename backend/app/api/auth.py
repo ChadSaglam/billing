@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -10,6 +12,7 @@ from app.auth import (
     hash_password,
     verify_password,
 )
+from app.config import settings as app_settings
 from app.database import get_db
 from app.limiter import limiter
 from app.models.settings import CompanySettings
@@ -48,6 +51,9 @@ class UserResponse(BaseModel):
     role: str
     tenant_id: int
     tenant_name: str
+    # Subscription state (R-11) so the frontend can show trial status.
+    subscription_plan: str
+    trial_ends_at: datetime | None
 
     model_config = {"from_attributes": True}
 
@@ -62,7 +68,18 @@ def register(request: Request, data: RegisterRequest, db: Session = Depends(get_
     if db.query(Tenant).filter(Tenant.slug == slug).first():
         slug = f"{slug}-{db.query(Tenant).count() + 1}"
 
-    tenant = Tenant(name=data.company_name, slug=slug)
+    # The plan/trial env settings finally land on a real model (R-11).
+    # A paid/default plan gets no trial clock at all.
+    trial_ends = None
+    if app_settings.DEFAULT_PLAN == "trial":
+        trial_ends = (datetime.now(UTC) + timedelta(days=app_settings.TRIAL_DAYS)).replace(tzinfo=None)
+
+    tenant = Tenant(
+        name=data.company_name,
+        slug=slug,
+        subscription_plan=app_settings.DEFAULT_PLAN,
+        trial_ends_at=trial_ends,
+    )
     db.add(tenant)
     db.flush()
 
@@ -121,4 +138,6 @@ def get_me(user: User = Depends(get_current_user)):
         role=user.role,
         tenant_id=user.tenant_id,
         tenant_name=user.tenant.name,
+        subscription_plan=user.tenant.subscription_plan,
+        trial_ends_at=user.tenant.trial_ends_at,
     )

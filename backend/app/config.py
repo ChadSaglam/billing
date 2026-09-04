@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     ALGORITHM: str = "HS256"
 
+    # Self-serve signup defaults (R-11). Both already exist in .env but were
+    # dropped by extra="ignore" — no model read them. Registration now does.
+    DEFAULT_PLAN: str = "trial"
+    TRIAL_DAYS: int = 14
+
     # Deliberately typed `str`, not `list[str]`.
     #
     # For a complex-typed field, pydantic-settings runs json.loads on the raw

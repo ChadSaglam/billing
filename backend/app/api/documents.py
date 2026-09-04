@@ -20,6 +20,7 @@ from app.schemas.document import (
     BulkStatusRequest,
     DocumentCreate,
     DocumentListRead,
+    DocumentPage,
     DocumentRead,
     DocumentUpdate,
     StatusUpdate,
@@ -30,14 +31,18 @@ from app.services.sanitizer import sanitize_text
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-def _build_line_item(item_data, document_id: int) -> LineItem:
+
+def _build_line_item(item_data, document_id: int, default_vat_rate: Decimal | None = None) -> LineItem:
     """Create a LineItem with a server-computed total.
 
     quantity x unit_price is the single source of truth; the client does not
-    get to state the line total (R-31).
+    get to state the line total (R-31). When the request omits vat_rate, the
+    tenant's configured default applies instead of a hardcoded one (R-12).
     """
     fields = item_data.model_dump()
     fields["description"] = sanitize_text(fields.get("description", ""))
+    if "vat_rate" not in item_data.model_fields_set and default_vat_rate is not None:
+        fields["vat_rate"] = default_vat_rate
     fields["total_price"] = (
         Decimal(fields["quantity"]) * Decimal(fields["unit_price"])
     ).quantize(Decimal("0.01"))
@@ -59,6 +64,7 @@ def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal
     total = after_discount + vat_amount
     return subtotal, discount_amount, vat_amount, total
 
+
 def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = False, with_client: bool = False) -> Document:
     query = db.query(Document).filter(Document.id == doc_id, Document.tenant_id == tenant_id)
     if with_items:
@@ -70,6 +76,7 @@ def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = Fal
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
+
 def _load_full(db: Session, doc_id: int, tenant_id: int) -> Document:
     return (
         db.query(Document)
@@ -78,19 +85,23 @@ def _load_full(db: Session, doc_id: int, tenant_id: int) -> Document:
         .first()
     )
 
+
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
     settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
     if not settings:
         raise HTTPException(status_code=500, detail="Company settings not configured")
     return settings
 
+
 # ── CRUD ──────────────────────────────────────────────
-@router.get("", response_model=list[DocumentListRead])
+@router.get("", response_model=list[DocumentListRead] | DocumentPage)
 def list_documents(
     document_type: str | None = Query(None),
     status: str | None = Query(None),
     client_id: int | None = Query(None),
     search: str | None = Query(None),
+    page: int | None = Query(None, ge=1),
+    page_size: int = Query(25, ge=1, le=200),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
@@ -108,7 +119,18 @@ def list_documents(
             (Document.document_number.ilike(pattern)) |
             (Document.client.has(Client.company_name.ilike(pattern)))
         )
-    return query.order_by(Document.date.desc(), Document.id.desc()).all()
+    query = query.order_by(Document.date.desc(), Document.id.desc())
+
+    # Backwards compatibility: without `page` the endpoint returns the plain
+    # list it always did. New consumers pass ?page=1&page_size=… and get the
+    # paginated envelope instead of the full table (R-13).
+    if page is None:
+        return query.all()
+
+    total = query.count()
+    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    return DocumentPage(items=items, total=total, page=page, page_size=page_size)
+
 
 # ── CSV/DATEV Export ──────────────────────────────────
 @router.get("/export/csv")
@@ -120,7 +142,7 @@ def export_documents_csv(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
-    
+
     query = (
         db.query(Document)
         .options(joinedload(Document.line_items), joinedload(Document.client))
@@ -206,6 +228,7 @@ def export_documents_csv(
         headers={"Content-Disposition": f'attachment; filename="export_{today}.csv"'},
     )
 
+
 @router.get("/{doc_id}", response_model=DocumentRead)
 def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _load_full(db, doc_id, tenant_id)
@@ -213,9 +236,16 @@ def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
+
 @router.post("", response_model=DocumentRead, status_code=201, dependencies=[Depends(require_editor)])
 def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc_data = data.model_dump(exclude={"line_items", "document_number"})
+    tenant_settings = _get_settings(db, tenant_id)
+    # A client that did not send a currency gets the tenant's default, not a
+    # hardcoded CHF (R-12).
+    if "currency" not in data.model_fields_set:
+        doc_data["currency"] = tenant_settings.default_currency
+
     doc_number = data.document_number
     if not doc_number:
         doc_number = generate_document_number(db, data.document_type, tenant_id)
@@ -233,7 +263,7 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_
     db.flush()
 
     for item_data in data.line_items:
-        db.add(_build_line_item(item_data, doc.id))
+        db.add(_build_line_item(item_data, doc.id, tenant_settings.default_vat_rate))
 
     db.flush()
     items = db.query(LineItem).filter(LineItem.document_id == doc.id).all()
@@ -246,6 +276,7 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_
     db.commit()
     return _load_full(db, doc.id, tenant_id)
 
+
 @router.put("/{doc_id}", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
@@ -254,9 +285,10 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
         setattr(doc, key, value)
 
     if data.line_items is not None:
+        tenant_settings = _get_settings(db, tenant_id)
         db.query(LineItem).filter(LineItem.document_id == doc_id).delete()
         for item_data in data.line_items:
-            db.add(_build_line_item(item_data, doc_id))
+            db.add(_build_line_item(item_data, doc_id, tenant_settings.default_vat_rate))
         db.flush()
         items = db.query(LineItem).filter(LineItem.document_id == doc_id).all()
         subtotal, discount_amount, vat_amount, total = _recalc_totals(items, doc.discount_percent)
@@ -277,11 +309,13 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     db.commit()
     return _load_full(db, doc.id, tenant_id)
 
+
 @router.delete("/{doc_id}", status_code=204, dependencies=[Depends(require_editor)])
 def delete_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _get_doc(db, doc_id, tenant_id)
     db.delete(doc)
     db.commit()
+
 
 # ── Status + Payment ──────────────────────────────────
 @router.patch("/{doc_id}/status", response_model=DocumentRead, dependencies=[Depends(require_editor)])
@@ -310,6 +344,7 @@ def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depend
 
     db.commit()
     return _load_full(db, doc.id, tenant_id)
+
 
 @router.post("/{doc_id}/duplicate", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def duplicate_document(
@@ -365,6 +400,7 @@ def duplicate_document(
     db.refresh(clone)
     return clone
 
+
 # ── Convert Offerte → Rechnung ────────────────────────
 @router.post("/{doc_id}/convert", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -411,6 +447,7 @@ def convert_offerte_to_rechnung(doc_id: int, db: Session = Depends(get_db), tena
     db.commit()
     return _load_full(db, rechnung.id, tenant_id)
 
+
 # ── Portal Token ──────────────────────────────────────
 @router.post("/{doc_id}/portal-token", response_model=DocumentRead, dependencies=[Depends(require_editor)])
 def generate_portal_token(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -418,6 +455,7 @@ def generate_portal_token(doc_id: int, db: Session = Depends(get_db), tenant_id:
     doc.generate_portal_token()
     db.commit()
     return _load_full(db, doc.id, tenant_id)
+
 
 # ── PDF ───────────────────────────────────────────────
 @router.get("/{doc_id}/pdf")
@@ -436,6 +474,7 @@ def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
 
 @router.get("/{doc_id}/preview")
 def preview_pdf(
@@ -469,6 +508,7 @@ def preview_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": "inline"},
     )
+
 
 @router.post("/{doc_id}/send-email", dependencies=[Depends(require_editor)])
 def send_document_email_endpoint(
@@ -510,6 +550,8 @@ def send_document_email_endpoint(
     db.commit()
 
     return {"message": "Email queued successfully", "recipient": recipient_email}
+
+
 # ── Bulk Actions ──────────────────────────────────────
 @router.post("/bulk/status", dependencies=[Depends(require_editor)])
 def bulk_update_status(data: BulkStatusRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -534,6 +576,7 @@ def bulk_update_status(data: BulkStatusRequest, db: Session = Depends(get_db), t
 
     db.commit()
     return {"updated": updated, "total": len(data.document_ids)}
+
 
 @router.post("/bulk/send-email", dependencies=[Depends(require_editor)])
 def bulk_send_email(data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -573,6 +616,7 @@ def bulk_send_email(data: BulkActionRequest, db: Session = Depends(get_db), tena
     db.commit()
     return {"sent": sent, "errors": errors}
 
+
 @router.post("/bulk/pdf-zip", dependencies=[Depends(require_editor)])
 def bulk_download_pdf_zip(data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = (
@@ -601,6 +645,7 @@ def bulk_download_pdf_zip(data: BulkActionRequest, db: Session = Depends(get_db)
         media_type="application/zip",
         headers={"Content-Disposition": 'attachment; filename="documents.zip"'},
     )
+
 
 # ── Recurring invoices helper ─────────────────────────
 def _calc_next_recurrence(base_date, recurrence: str):

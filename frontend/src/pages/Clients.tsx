@@ -2,33 +2,38 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, Pencil, Trash2, Users } from "lucide-react";
-import { getClients, createClient, updateClient, deleteClient } from "@/lib/api";
+import { getClientsPage, createClient, updateClient, deleteClient } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { Client, CreateClientPayload } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { optimisticDelete } from "@/lib/optimistic";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { PageHeader, EmptyState, TableSkeleton, ConfirmDialog } from "@/components/shared";
 import { ClientFormDialog, EMPTY_CLIENT } from "@/components/clients/ClientFormDialog";
 
+const PAGE_SIZE = 25;
+
 export default function Clients() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState<CreateClientPayload>(EMPTY_CLIENT);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
-  const { data: clients, isLoading } = useQuery({
-    queryKey: queryKeys.clients.list(search || undefined),
-    queryFn: () => getClients(search || undefined),
+  // Page is appended to the key the factory returns so every page gets its
+  // own cache entry (R-13).
+  const { data, isLoading } = useQuery({
+    queryKey: [...queryKeys.clients.list(search || undefined), page],
+    queryFn: () => getClientsPage(search || undefined, page, PAGE_SIZE),
   });
+  const clients = data?.items;
 
   const invalidateClients = () => queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
 
@@ -52,23 +57,17 @@ export default function Clients() {
     onError: () => toast({ title: "Failed to update client", variant: "destructive" }),
   });
 
+  // No optimistic update here any more: the cache now holds a paginated
+  // envelope per page, and optimisticDelete expects a bare array. A plain
+  // invalidation is correct and still instant enough.
   const deleteMutation = useMutation({
     mutationFn: deleteClient,
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.clients.all });
-      return optimisticDelete<Client>(queryClient, queryKeys.clients.list(search || undefined), id);
-    },
-    onError: (_err, _id, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKeys.clients.list(search || undefined), context.previous);
-      }
-      toast({ title: "Failed to delete client", variant: "destructive" });
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
       setDeleteTarget(null);
+      toast({ title: "Client deleted" });
     },
-    onSuccess: () => toast({ title: "Client deleted" }),
+    onError: () => toast({ title: "Failed to delete client", variant: "destructive" }),
   });
 
   const openCreate = () => {
@@ -126,7 +125,10 @@ export default function Clients() {
           className="pl-10"
           placeholder="Search clients..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
         />
       </div>
 
@@ -199,6 +201,34 @@ export default function Clients() {
               </Card>
             ))}
           </div>
+
+          {/* Pagination footer (R-13) */}
+          {data && data.total > 0 && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span>
+                {data.total} {data.total === 1 ? "client" : "clients"} · page {data.page} of{" "}
+                {Math.max(1, Math.ceil(data.total / data.page_size))}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page * data.page_size >= data.total}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <EmptyState
