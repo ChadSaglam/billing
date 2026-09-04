@@ -1,10 +1,27 @@
+import json
+from functools import cached_property
 from pathlib import Path
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_FILE = ROOT_DIR / ".env"
+
+
+def _parse_origins(raw: str) -> list[str]:
+    """Accept a comma-separated string or a JSON list.
+
+    A JSON list breaks whenever .env is exported into the environment
+    (`set -a; source .env`, most CI runners, systemd EnvironmentFile),
+    because the shell strips the quotes. Comma-separated survives all of
+    them; the JSON form stays supported so existing .env files keep working.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return []
+    if text.startswith("["):
+        return [str(origin).strip() for origin in json.loads(text)]
+    return [origin.strip() for origin in text.split(",") if origin.strip()]
 
 
 class Settings(BaseSettings):
@@ -14,7 +31,19 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     ALGORITHM: str = "HS256"
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]
+
+    # Deliberately typed `str`, not `list[str]`.
+    #
+    # For a complex-typed field, pydantic-settings runs json.loads on the raw
+    # environment value inside its own source, before any field validator
+    # runs — so a validator cannot rescue a non-JSON value and the app dies at
+    # import with JSONDecodeError. `Annotated[..., NoDecode]` fixes that but
+    # only exists in newer pydantic-settings, which turns a config detail into
+    # a version floor. Keeping the field a plain string sidesteps the decoder
+    # entirely and works on every version; `allowed_origins` below is the
+    # parsed value callers should use. (R-36)
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
+
     FRONTEND_URL: str = "http://localhost:5173"
 
     SMTP_HOST: str = ""
@@ -23,21 +52,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     FROM_EMAIL: str = ""
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def _split_origins(cls, value):
-        """Accept a comma-separated string as well as a JSON list.
-
-        Exporting .env into the environment (`set -a; source .env`, most CI
-        runners, systemd EnvironmentFile) strips the quotes from a JSON list
-        and the app then dies at import. A plain comma-separated string
-        survives every one of those. (R-36)
-        """
-        if isinstance(value, str):
-            text = value.strip()
-            if not text.startswith("["):
-                return [origin.strip() for origin in text.split(",") if origin.strip()]
-        return value
+    @cached_property
+    def allowed_origins(self) -> list[str]:
+        """CORS origins as a list. Use this, not the raw ALLOWED_ORIGINS."""
+        return _parse_origins(self.ALLOWED_ORIGINS)
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
