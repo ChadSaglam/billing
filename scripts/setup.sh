@@ -45,7 +45,14 @@ echo ""
 # ── Backend ────────────────────────────────────────────
 if [[ "$MODE" != "docker" ]]; then
   log_info "Backend"
-  [[ -d "$VENV_DIR" ]] || { python3 -m venv "$VENV_DIR"; log_ok "venv created"; }
+  # Never a bare `python3`: the newest interpreter on the machine (Homebrew
+  # 3.14 today) routinely outruns what pinned deps support — SQLAlchemy
+  # 2.0.35 cannot even scan the models on 3.14. CI and Docker run 3.12, so
+  # prefer it, then 3.13, and only then whatever `python3` happens to be.
+  if [[ ! -d "$VENV_DIR" ]]; then
+    PY_BIN="$(command -v python3.12 || command -v python3.13 || command -v python3)"
+    "$PY_BIN" -m venv "$VENV_DIR" && log_ok "venv created ($("$PY_BIN" --version 2>&1))"
+  fi
   # shellcheck disable=SC1091
   source "$VENV_DIR/bin/activate"
   python -m pip install -q --upgrade pip
