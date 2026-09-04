@@ -301,6 +301,23 @@ export const getMe = async (): Promise<AuthUser> => {
   return data;
 };
 
+// ── Logout (R-16) ────────────────────────────────────
+// Revokes the refresh token server-side before clearing local storage, so
+// the token dies instead of staying valid for the rest of its 30 days.
+// Best effort: local logout proceeds even if the server is unreachable.
+export const logout = async (): Promise<void> => {
+  const refreshToken = getRefreshToken();
+  if (refreshToken) {
+    try {
+      await api.post('/api/auth/logout', { refresh_token: refreshToken });
+    } catch {
+      // Server unreachable — local logout still proceeds.
+    }
+  }
+  clearTokens();
+  window.location.href = '/login';
+};
+
 // ── Logo ─────────────────────────────────────────────────
 export const uploadLogo = async (file: File): Promise<{ logo_url: string }> => {
   const formData = new FormData();

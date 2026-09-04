@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.models.refresh_token import RefreshToken
 from app.models.tenant import Tenant
 from app.models.user import User
 
@@ -28,9 +30,23 @@ def create_access_token(user_id: int, tenant_id: int) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(user_id: int, tenant_id: int) -> str:
+def create_refresh_token(user_id: int, tenant_id: int, db: Session) -> str:
+    """Issue a refresh token and register its `jti` server-side (R-16).
+
+    The row is what makes the token revocable (/api/auth/logout) and
+    single-use (rotation at /api/auth/refresh). The caller commits.
+    """
     expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": str(user_id), "tid": tenant_id, "exp": expire, "type": "refresh"}
+    jti = uuid4().hex
+    db.add(
+        RefreshToken(
+            jti=jti,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            expires_at=expire.replace(tzinfo=None),
+        )
+    )
+    payload = {"sub": str(user_id), "tid": tenant_id, "exp": expire, "type": "refresh", "jti": jti}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 

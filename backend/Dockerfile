@@ -2,10 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# libpq for psycopg2; cairo/pango/gdk-pixbuf for weasyprint.
+# libpq for psycopg2; gcc/libffi for the occasional source build.
+# cairo/pango/gdk-pixbuf/shared-mime-info left together with weasyprint (R-18).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      gcc libpq-dev libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
-      libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info \
+      gcc libpq-dev libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
