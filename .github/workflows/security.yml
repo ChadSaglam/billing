@@ -62,8 +62,31 @@ jobs:
       - run: npm ci
       # Blocking at high. Two moderate react-router advisories remain and
       # need a v6 -> v7 major upgrade, tracked as R-42.
+      #
+      # `npm audit` calls the npmjs advisory endpoint at run time, so a
+      # registry outage ("socket hang up", "audit endpoint returned an
+      # error") fails the job with nothing to do with this codebase. Retry,
+      # then warn and pass on a transport error — but still fail hard when
+      # the audit actually returns findings.
       - name: npm audit (high/critical)
-        run: npm audit --audit-level=high
+        run: |
+          transport_error='audit endpoint returned an error|socket hang up|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|502|503|504'
+          for attempt in 1 2 3; do
+            if out=$(npm audit --audit-level=high 2>&1); then
+              echo "$out"
+              exit 0
+            fi
+            if echo "$out" | grep -qiE "$transport_error"; then
+              echo "::warning::npm registry unreachable (attempt $attempt/3), retrying"
+              sleep $((attempt * 15))
+              continue
+            fi
+            echo "$out"
+            echo "::error::npm audit found high or critical advisories"
+            exit 1
+          done
+          echo "$out"
+          echo "::warning::npm audit could not reach the registry after 3 attempts — not treating this as a finding"
 
   # CodeQL is NOT defined here on purpose.
   #
