@@ -44,7 +44,12 @@ services:
       start_period: 60s
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # The Dockerfile is multi-stage now (R-20): `dev` is the vite dev
+      # server this stack has always run. Production builds separately:
+      #   docker build --target prod -t billing-frontend ./frontend
+      target: dev
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-9200}:5173"
