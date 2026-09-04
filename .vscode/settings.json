@@ -1,0 +1,8 @@
+{
+  // R-43: always use the project venv, never the system Python.
+  // VS Code opens integrated terminals with backend/venv already active,
+  // so `pip install` / `pytest` can no longer land in the system
+  // interpreter and collide with unrelated tools (crewai, mcpo, reflex).
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv",
+  "python.terminal.activateEnvironment": true
+}
