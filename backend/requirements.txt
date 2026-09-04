@@ -29,13 +29,13 @@ bcrypt==4.0.1
 python-multipart>=0.0.20
 
 # ── PDF / Swiss QR ────────────────────────────────────────
+# R-18: reportlab + qrcode are the pair pdf_generator.py actually imports.
+# weasyprint (plus its pango/cairo system packages), qrbill and svgwrite
+# were installed but never imported anywhere — dropped.
 reportlab==4.1.0
 qrcode[pil]>=7.0
 Pillow>=10.0
-qrbill==1.1.0
-svgwrite==1.4.3
 python-stdnum==2.2
-weasyprint>=68.1
 
 # ── Misc ──────────────────────────────────────────────────
 jinja2==3.1.6

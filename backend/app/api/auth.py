@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,7 @@ from app.auth import (
 from app.config import settings as app_settings
 from app.database import get_db
 from app.limiter import limiter
+from app.models.refresh_token import RefreshToken
 from app.models.settings import CompanySettings
 from app.models.tenant import Tenant
 from app.models.user import User
@@ -35,6 +37,10 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
     refresh_token: str
 
 
@@ -94,12 +100,12 @@ def register(request: Request, data: RegisterRequest, db: Session = Depends(get_
     db.flush()
 
     db.add(CompanySettings(tenant_id=tenant.id, company_name=data.company_name))
+
+    access = create_access_token(user.id, tenant.id)
+    refresh_token = create_refresh_token(user.id, tenant.id, db)
     db.commit()
 
-    return TokenResponse(
-        access_token=create_access_token(user.id, tenant.id),
-        refresh_token=create_refresh_token(user.id, tenant.id),
-    )
+    return TokenResponse(access_token=access, refresh_token=refresh_token)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -110,23 +116,65 @@ def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
-    return TokenResponse(
-        access_token=create_access_token(user.id, user.tenant_id),
-        refresh_token=create_refresh_token(user.id, user.tenant_id),
-    )
+
+    access = create_access_token(user.id, user.tenant_id)
+    refresh_token = create_refresh_token(user.id, user.tenant_id, db)
+    db.commit()
+
+    return TokenResponse(access_token=access, refresh_token=refresh_token)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")  # R-17: the last unlimited auth endpoint
+def refresh(request: Request, data: RefreshRequest, db: Session = Depends(get_db)):
     payload = decode_refresh_token(data.refresh_token)
+
+    # Server-side revocation with rotation (R-16). Every use retires the
+    # presented token and issues a fresh one, so a stolen token dies the
+    # first time either the thief or the real user refreshes. Tokens issued
+    # before this change carry no registered jti and are rejected — those
+    # users simply log in again.
+    stored = db.query(RefreshToken).filter(RefreshToken.jti == payload.get("jti", "")).first()
+    if (
+        stored is None
+        or stored.revoked_at is not None
+        or stored.expires_at < datetime.now(UTC).replace(tzinfo=None)
+    ):
+        raise HTTPException(status_code=401, detail="Refresh token revoked or unknown")
+
     user_id = int(payload["sub"])
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or disabled")
-    return TokenResponse(
-        access_token=create_access_token(user.id, user.tenant_id),
-        refresh_token=create_refresh_token(user.id, user.tenant_id),
-    )
+
+    stored.revoked_at = datetime.now(UTC).replace(tzinfo=None)
+    access = create_access_token(user.id, user.tenant_id)
+    new_refresh = create_refresh_token(user.id, user.tenant_id, db)
+    db.commit()
+    return TokenResponse(access_token=access, refresh_token=new_refresh)
+
+
+@router.post("/logout", status_code=204)
+@limiter.limit("30/minute")
+def logout(request: Request, data: LogoutRequest, db: Session = Depends(get_db)):
+    """Revoke a refresh token (R-16).
+
+    Deliberately unauthenticated and quiet: it must work even when the
+    access token has already expired, and it must not become an oracle for
+    token validity — unknown or already-revoked tokens get the same 204.
+    """
+    try:
+        payload = jwt.decode(
+            data.refresh_token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM]
+        )
+    except (JWTError, ValueError):
+        return
+    if payload.get("type") != "refresh":
+        return
+    stored = db.query(RefreshToken).filter(RefreshToken.jti == payload.get("jti", "")).first()
+    if stored and stored.revoked_at is None:
+        stored.revoked_at = datetime.now(UTC).replace(tzinfo=None)
+        db.commit()
 
 
 @router.get("/me", response_model=UserResponse)
