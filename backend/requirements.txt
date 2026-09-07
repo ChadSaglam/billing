@@ -21,7 +21,7 @@ pydantic[email]>=2.9.2
 # ── Auth ──────────────────────────────────────────────────
 # 3.3.0 had PYSEC-2024-233 and PYSEC-2025-185. This library signs and
 # verifies every JWT in the app.
-python-jose[cryptography]>=3.4.0
+python-jose[cryptography]>=3.5.0
 bcrypt==4.0.1
 
 # ── Uploads ───────────────────────────────────────────────
