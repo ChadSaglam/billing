@@ -37,6 +37,11 @@ qrcode[pil]>=7.0
 Pillow>=10.0
 python-stdnum==2.2
 
+# ── Observability ─────────────────────────────────────────
+# Error monitoring in prod, mirrors the buchhaltung repo. Off unless
+# SENTRY_DSN is set; app/sentry.py imports it lazily.
+sentry-sdk[fastapi]>=2.0
+
 # ── Misc ──────────────────────────────────────────────────
 jinja2==3.1.6
 httpx==0.27.2

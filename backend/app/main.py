@@ -18,8 +18,10 @@ from app.limiter import limiter
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware
 from app.models.user import User
+from app.sentry import configure_sentry
 
 configure_logging(app_settings.LOG_LEVEL)
+configure_sentry(app_settings.SENTRY_DSN, app_settings.APP_ENV)
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
