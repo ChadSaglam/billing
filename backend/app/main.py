@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -14,7 +15,12 @@ from app.auth import get_current_user
 from app.config import settings as app_settings
 from app.database import SessionLocal, get_db
 from app.limiter import limiter
+from app.logging_config import configure_logging
+from app.middleware import RequestContextMiddleware
 from app.models.user import User
+
+configure_logging(app_settings.LOG_LEVEL)
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = BASE_DIR / "uploads"
@@ -46,11 +52,11 @@ def _run_scheduled_jobs(db: Session, source: str) -> None:
     try:
         count = mark_overdue_invoices(db)
         if count:
-            print(f"[{source}] Marked {count} invoices as overdue")
+            logger.info("[%s] Marked %d invoices as overdue", source, count)
 
         created = process_recurring_invoices(db)
         if created:
-            print(f"[{source}] Created {created} recurring invoices")
+            logger.info("[%s] Created %d recurring invoices", source, created)
     finally:
         if locked:
             db.execute(
@@ -68,8 +74,8 @@ async def _background_jobs():
                 _run_scheduled_jobs(db, "background")
             finally:
                 db.close()
-        except Exception as e:
-            print(f"[background] Error: {e}")
+        except Exception:
+            logger.exception("[background] scheduled jobs failed")
 
         await asyncio.sleep(3600)
 
@@ -112,7 +118,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+# add_middleware() prepends, so this is the outermost layer: the id exists
+# before CORS and every handler run, and preflight responses carry it too.
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(auth.router)
 app.include_router(clients.router)
