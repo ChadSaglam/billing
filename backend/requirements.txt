@@ -6,12 +6,12 @@
 # fastapi is unpinned upward so pip resolves a starlette without the
 # 7 advisories open against 0.38.6 (R-39).
 fastapi>=0.118.0
-uvicorn==0.30.6
+uvicorn==0.52.4
 
 # ── Database ──────────────────────────────────────────────
-sqlalchemy==2.0.35
-alembic==1.13.2
-psycopg2-binary==2.9.11
+sqlalchemy==2.0.52
+alembic==1.19.1
+psycopg2-binary==2.9.12
 
 # ── Settings / validation ─────────────────────────────────
 # Left open so pip can satisfy whatever the resolved fastapi requires.
@@ -39,8 +39,8 @@ python-stdnum==2.2
 
 # ── Misc ──────────────────────────────────────────────────
 jinja2==3.1.6
-httpx==0.27.2
-slowapi==0.1.9
+httpx==0.28.1
+slowapi==0.1.10
 # The HTML sanitiser for anything rendered into a PDF or email.
 bleach>=6.4.0
 python-dateutil==2.9.0
