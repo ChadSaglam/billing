@@ -253,6 +253,18 @@ Rechnung:  Draft → Sent → Paid
                         → Cancelled
 ```
 
+## Observability
+
+All knobs live in the repo-root `.env` (see `.env.example`).
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `LOG_LEVEL` | `INFO` | Root log level. Lines are `time LEVEL [request_id] logger: message`; `print()` is not used. |
+| `SENTRY_DSN` | empty | Set to enable Sentry (`sentry-sdk[fastapi]`). Empty = off, SDK never imported. |
+| `STORAGE_BACKEND` | `local` | Where logo uploads go: `local` (disk under `backend/uploads`, single replica) or `s3` (any S3-compatible bucket; needs `pip install boto3` plus `S3_BUCKET`, optional `S3_ENDPOINT_URL`, `S3_PUBLIC_BASE_URL`, AWS creds from env). |
+
+Every response carries an `X-Request-ID` header (echoed if the client sent one, otherwise generated) and the same id appears in every log line written while handling that request. `/docs`, `/redoc` and `/openapi.json` are disabled when `APP_ENV=production`.
+
 ## Extending
 
 - **New fields**: SQLAlchemy model → Pydantic schema → TypeScript type → UI
