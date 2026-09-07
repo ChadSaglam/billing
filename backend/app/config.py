@@ -54,6 +54,13 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Uploads (app/services/storage.py). local = disk under backend/uploads,
+    # s3 = any S3-compatible bucket; AWS_* credentials are read by boto3.
+    STORAGE_BACKEND: str = "local"
+    S3_BUCKET: str = ""
+    S3_ENDPOINT_URL: str = ""
+    S3_PUBLIC_BASE_URL: str = ""
+
     SMTP_HOST: str = ""
     SMTP_PORT: int = 465
     SMTP_USER: str = ""

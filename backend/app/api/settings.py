@@ -1,6 +1,5 @@
 import io
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -9,11 +8,9 @@ from app.auth import get_tenant_id, require_editor
 from app.database import get_db
 from app.models.settings import CompanySettings
 from app.schemas.settings import SettingsRead, SettingsUpdate
+from app.services.storage import StorageBackend, get_storage
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
-
-BASE_DIR = Path(__file__).resolve().parent.parent.parent 
-UPLOAD_DIR = BASE_DIR / "uploads" / "logos"
 
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
     settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
@@ -49,12 +46,14 @@ async def upload_logo(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
+    storage: StorageBackend = Depends(get_storage),
 ):
     """Store a tenant logo.
 
     Validates the declared content type, the real image content and the size,
     and generates the filename itself. Previously it trusted the client's
-    filename extension and wrote unbounded bytes to disk (R-09).
+    filename extension and wrote unbounded bytes to disk (R-09). Where the
+    bytes end up is the storage backend's business (4.4).
     """
     settings = _get_settings(db, tenant_id)
 
@@ -78,17 +77,16 @@ async def upload_logo(
     except Exception:
         raise HTTPException(status_code=400, detail="File is not a valid image") from None
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}{ALLOWED_LOGO_TYPES[file.content_type]}"
-    (UPLOAD_DIR / filename).write_bytes(content)
+    key = f"logos/{uuid.uuid4().hex}{ALLOWED_LOGO_TYPES[file.content_type]}"
+    url = storage.save(key, content, file.content_type)
 
-    # Remove the previous logo so uploads cannot accumulate unbounded.
-    if settings.logo_url:
-        old = UPLOAD_DIR / Path(settings.logo_url).name
-        if old.is_file() and old.parent == UPLOAD_DIR:
-            old.unlink(missing_ok=True)
+    # Remove the previous logo so uploads cannot accumulate unbounded. Only
+    # keys this backend produced are touched; a pasted external URL is left.
+    old_key = storage.url_to_key(settings.logo_url or "")
+    if old_key and old_key != key:
+        storage.delete(old_key)
 
-    settings.logo_url = f"/uploads/logos/{filename}"
+    settings.logo_url = url
     db.commit()
     db.refresh(settings)
     return {"logo_url": settings.logo_url}

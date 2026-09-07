@@ -1,6 +1,5 @@
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,13 +18,12 @@ from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware
 from app.models.user import User
 from app.sentry import configure_sentry
+from app.services.storage import UPLOADS_DIR
 
 configure_logging(app_settings.LOG_LEVEL)
 configure_sentry(app_settings.SENTRY_DSN, app_settings.APP_ENV)
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOADS_DIR = BASE_DIR / "uploads"
 LOGOS_DIR = UPLOADS_DIR / "logos"
 
 # Postgres advisory lock id for the scheduled jobs. Any constant works — it
