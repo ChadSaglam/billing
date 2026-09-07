@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     FROM_EMAIL: str = ""
 
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV == "production"
+
     @cached_property
     def allowed_origins(self) -> list[str]:
         """CORS origins as a list. Use this, not the raw ALLOWED_ORIGINS."""

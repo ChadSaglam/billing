@@ -96,6 +96,11 @@ app = FastAPI(
     description="Offerte & Rechnungen management for ChaDev",
     version="2.5.0",
     lifespan=lifespan,
+    # The interactive docs enumerate every route and schema. Nothing in
+    # production needs that, so they are not registered there (2.1).
+    docs_url=None if app_settings.is_production else "/docs",
+    redoc_url=None if app_settings.is_production else "/redoc",
+    openapi_url=None if app_settings.is_production else "/openapi.json",
 )
 
 app.state.limiter = limiter
@@ -155,7 +160,7 @@ def health(db: Session = Depends(get_db)):
     return health
 
 
-if app_settings.APP_ENV != "production":
+if not app_settings.is_production:
 
     @app.post("/api/seed")
     def seed_data(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
