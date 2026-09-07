@@ -7,15 +7,19 @@
 
 ## NOW
 
-**Current phase:** Phase 0 ✅ done → starting Phase 1
+**Current phase:** Phase 1 — Platform contract — IN PROGRESS
 **Branch:** `feat/phase1-platform-contract`
-**Next action:** Phase 1.3 (adopt shared error contract)
+**Next action:** Awaiting D2 (SSO direction) confirm, then implement 1.3 error contract adoption.
 
 ---
 
 ## D1 — DECIDED
 
-**B — Separate repos + shared platform contract.** billing stays independently deployable; shares JWT/tenant/error contract via `chadev-platform`.
+**B — Separate repos + shared platform contract.**
+
+## D2 — PENDING (SSO direction)
+
+Proposal (see chadev-platform contracts/auth.md): billing issues JWTs (already has access+refresh+jti), buchhaltung verifies via shared `SECRET_KEY` (HS256) now, JWKS/RS256 later in Phase 6.
 
 ---
 
@@ -25,36 +29,27 @@
 |---|---|---|
 | Purpose | Offerte/Rechnungen, QR-bill PDF, client portal | Receipt/bank-statement scan → AI classification → Banana export |
 | Backend | FastAPI, sync SQLAlchemy, psycopg2 | FastAPI, async SQLAlchemy, asyncpg (+SQLite dev) |
-| Frontend | React 19 + Vite + React Router, shadcn/ui, TanStack Query | Next.js 16 App Router, custom UI, Zustand + SWR |
 | Auth | JWT access+refresh (revocable jti), roles admin/editor/viewer, trial gate | JWT, role owner only, plan free |
 | Tenant | tenants(subscription_plan, trial_ends_at, is_active) | tenants(plan) only |
-| User | hashed_password, full_name | password_hash, display_name |
 | Errors | Default FastAPI {"detail"} | Uniform {"error":{code,message,request_id}} + Sentry |
-| i18n | none (German hardcoded) | lib/i18n.ts |
-| Types | api.generated.ts (openapi-typescript) | api-types.ts + make api-types CI check |
 | Tests | 29 backend · 1 e2e · 0 unit FE | 6 backend · 1 e2e smoke · 0 unit FE |
-| CI | ci.yml + security.yml (ruff, alembic, pytest cov, tsc) | ci.yml |
-| Jobs | in-process loop + pg advisory lock (overdue, recurring) | scheduler + training worker in-process |
-| Docs | SPEC.md, README, SECURITY.md | AGENTS.md, CLAUDE.md, AI_CONTEXT.md, Makefile |
 | Size | 4.5k py · 10k ts | 7k py · 11.6k ts |
 
-**Shared today:** nothing. Two tenants tables, two users tables, two logins, two design systems.
-
-**Biggest risks (billing, verify in Phase 1/2):**
+**Biggest risks (billing):**
 1. /docs + /openapi.json open in production. [Medium]
 2. print() logging in jobs, no request-id, no Sentry. [Medium]
 3. Uploads (logos) on local disk → breaks with >1 replica. [Medium]
-
-**Cross-repo risks (buchhaltung, tracked here for context):**
-4. buchhaltung: only 6 tests for 7k LOC of money-relevant code. [High]
-5. buchhaltung: modell/page.tsx = 955 lines in one file. [Medium]
 
 ---
 
 ## Phase 1 — Platform contract — M — IN PROGRESS (billing tasks)
 
-- [ ] 1.3 Adopt uniform {"error":{code,message,request_id}} shape (copy from buchhaltung core/errors.py) (M) — API contract change, flag in CHANGELOG
-- [ ] 1.5 SSO: issue JWT with shared SECRET_KEY/JWKS so buchhaltung can verify (S, decision only)
+- [x] Contract drafts reviewed: contracts/errors.md, contracts/auth.md (chadev-platform) (S)
+- [ ] 1.3a Add exception handlers mirroring buchhaltung's core/errors.py: map HTTPException, RequestValidationError, unhandled Exception → {"error":{code,message,request_id}} (M) — **breaking API change, flag in CHANGELOG**
+- [ ] 1.3b Add request-id middleware (X-Request-Id generate/propagate) (S)
+- [ ] 1.3c Regenerate api.generated.ts (openapi-typescript) after error shape change (S)
+- [ ] 1.3d Update tests/Playwright expecting old {"detail"} shape (M)
+- [ ] 1.5 D2: confirm SSO issuing side (billing issues, shared SECRET_KEY) — **awaiting your reply**
 
 ## Phase 2 — Security & tenant isolation — M (billing tasks)
 
@@ -101,15 +96,16 @@
 
 ## DONE
 
-- [x] Phase 0 Recon — system map written (2026-09-07)
+- [x] Phase 0 Recon (2026-09-07)
 - [x] D1 decided — Option B (2026-09-07)
-- [x] Branch `feat/phase1-platform-contract` created off main (2026-09-07)
+- [x] Branch feat/phase1-platform-contract created (2026-09-07)
+- [x] Reviewed chadev-platform contract drafts (2026-09-07)
 
 ---
 
 ## SESSION HANDOFF
 
 ```
-STATE: Phase 0 done. D1 = B. On feat/phase1-platform-contract.
-NEXT ACTION: 1.3 adopt error contract from buchhaltung (flag as breaking API change).
+STATE: Phase 1 in progress. Contracts drafted on chadev-platform. Awaiting D2 (SSO direction).
+NEXT ACTION: confirm D2, then implement 1.3 error contract adoption (breaking change, flag CHANGELOG).
 ```
