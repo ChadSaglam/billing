@@ -16,7 +16,7 @@ psycopg2-binary==2.9.11
 # ── Settings / validation ─────────────────────────────────
 # Left open so pip can satisfy whatever the resolved fastapi requires.
 pydantic-settings>=2.5.2
-pydantic[email]>=2.9.2
+pydantic[email]>=2.13.5
 
 # ── Auth ──────────────────────────────────────────────────
 # 3.3.0 had PYSEC-2024-233 and PYSEC-2025-185. This library signs and
