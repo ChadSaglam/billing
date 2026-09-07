@@ -26,7 +26,7 @@ bcrypt==4.0.1
 
 # ── Uploads ───────────────────────────────────────────────
 # Handles the logo upload; 0.0.9 had 7 advisories.
-python-multipart>=0.0.20
+python-multipart>=0.0.32
 
 # ── PDF / Swiss QR ────────────────────────────────────────
 # R-18: reportlab + qrcode are the pair pdf_generator.py actually imports.
