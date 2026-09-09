@@ -26,6 +26,8 @@ def _parse_origins(raw: str) -> list[str]:
 
 class Settings(BaseSettings):
     APP_ENV: str = "development"
+    # Python logging level name; logs are JSON lines on stdout (R-27).
+    LOG_LEVEL: str = "INFO"
     DATABASE_URL: str = ""
     SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
