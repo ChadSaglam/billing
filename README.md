@@ -262,6 +262,24 @@ Rechnung:  Draft → Sent → Paid
 - **Migrations**: `alembic revision --autogenerate -m "description"`
 - **MwSt/VAT**: Add `vat_rate` and `vat_amount` fields to documents and line items
 
+## Storage
+
+Logo uploads go through a `StorageBackend` (`backend/app/services/storage.py`, R-90).
+
+| Variable | Default | Notes |
+|---|---|---|
+| `STORAGE_BACKEND` | `local` | `local` or `s3` |
+| `S3_BUCKET` | | required for `s3` |
+| `S3_ENDPOINT_URL` | | leave empty for AWS; set for MinIO / R2 / Hetzner |
+| `S3_ACCESS_KEY`, `S3_SECRET_KEY` | | empty = boto3 default credential chain |
+| `S3_REGION` | | |
+| `S3_PUBLIC_BASE_URL` | derived | public URL prefix for objects (CDN or bucket URL) |
+
+`local` writes to `backend/uploads/` and serves it at `/uploads` from the app
+itself. That directory is not shared between containers, so **run with more
+than one app replica only with `STORAGE_BACKEND=s3`** (any S3-compatible
+bucket; `boto3` is imported only when selected).
+
 ## Deployment
 
 See `billing-deployment-guide.md` for full instructions on deploying to a Hostinger VPS with Docker, Nginx, SSL, and the `chadev.space` domain.

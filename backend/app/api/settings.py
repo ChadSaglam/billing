@@ -1,6 +1,5 @@
 import io
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -9,11 +8,9 @@ from app.auth import get_tenant_id, require_editor
 from app.database import get_db
 from app.models.settings import CompanySettings
 from app.schemas.settings import SettingsRead, SettingsUpdate
+from app.services.storage import get_storage
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
-
-BASE_DIR = Path(__file__).resolve().parent.parent.parent 
-UPLOAD_DIR = BASE_DIR / "uploads" / "logos"
 
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
     settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
@@ -78,17 +75,17 @@ async def upload_logo(
     except Exception:
         raise HTTPException(status_code=400, detail="File is not a valid image") from None
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}{ALLOWED_LOGO_TYPES[file.content_type]}"
-    (UPLOAD_DIR / filename).write_bytes(content)
+    storage = get_storage()
+    key = f"logos/{uuid.uuid4().hex}{ALLOWED_LOGO_TYPES[file.content_type]}"
+    logo_url = storage.save(key, content, file.content_type)
 
-    # Remove the previous logo so uploads cannot accumulate unbounded.
-    if settings.logo_url:
-        old = UPLOAD_DIR / Path(settings.logo_url).name
-        if old.is_file() and old.parent == UPLOAD_DIR:
-            old.unlink(missing_ok=True)
+    # Remove the previous logo so uploads cannot accumulate unbounded — but
+    # only if it lives in this backend (R-90).
+    old_key = storage.key_for_url(settings.logo_url or "")
+    if old_key and old_key != key:
+        storage.delete(old_key)
 
-    settings.logo_url = f"/uploads/logos/{filename}"
+    settings.logo_url = logo_url
     db.commit()
     db.refresh(settings)
     return {"logo_url": settings.logo_url}

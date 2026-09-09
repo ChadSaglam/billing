@@ -61,6 +61,16 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     FROM_EMAIL: str = ""
 
+    # Upload storage (R-90). "local" serves ./uploads via StaticFiles and only
+    # works with a single replica; "s3" is any S3-compatible bucket.
+    STORAGE_BACKEND: str = "local"
+    S3_BUCKET: str = ""
+    S3_ENDPOINT_URL: str = ""
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_REGION: str = ""
+    S3_PUBLIC_BASE_URL: str = ""
+
     @cached_property
     def allowed_origins(self) -> list[str]:
         """CORS origins as a list. Use this, not the raw ALLOWED_ORIGINS."""

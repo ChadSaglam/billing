@@ -45,6 +45,10 @@ slowapi==0.1.9
 bleach>=6.4.0
 python-dateutil==2.9.0
 
+# ── Storage ───────────────────────────────────────────────
+# Imported lazily, only when STORAGE_BACKEND=s3 (R-90).
+boto3>=1.34
+
 # ── Observability ─────────────────────────────────────────
 # Imported lazily, only when SENTRY_DSN is set (R-91).
 sentry-sdk[fastapi]>=2.0
