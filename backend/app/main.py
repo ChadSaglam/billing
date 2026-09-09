@@ -15,11 +15,13 @@ from app.auth import get_current_user
 from app.config import settings as app_settings
 from app.core.errors import RequestContextMiddleware, install_error_handlers
 from app.core.logging_config import configure_logging
+from app.core.sentry import configure_sentry
 from app.database import SessionLocal, get_db
 from app.limiter import limiter
 from app.models.user import User
 
 configure_logging(app_settings.LOG_LEVEL)
+configure_sentry(app_settings.SENTRY_DSN, app_settings.APP_ENV)
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
