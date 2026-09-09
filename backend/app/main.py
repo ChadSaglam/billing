@@ -91,11 +91,18 @@ async def lifespan(app: FastAPI):
     task.cancel()
 
 
+_is_production = app_settings.APP_ENV == "production"
+
 app = FastAPI(
     title="ChaDev Billing API",
     description="Offerte & Rechnungen management for ChaDev",
     version="2.5.0",
     lifespan=lifespan,
+    # Swagger/ReDoc and the schema list every route and model. Hidden in
+    # production (R-89); still served in dev/test, where tests rely on them.
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 app.state.limiter = limiter
