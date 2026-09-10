@@ -93,7 +93,7 @@ jobs:
           retention-days: 7
 
   frontend:
-    name: Frontend (typecheck · lint · build)
+    name: Frontend (typecheck · lint · test · build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -114,6 +114,9 @@ jobs:
 
       - name: ESLint
         run: npx eslint src/
+
+      - name: Vitest
+        run: npm run test
 
       - name: Production build
         run: npm run build
