@@ -2,9 +2,9 @@
 
 > One running list. Never duplicated — items move between sections, they don't get re-added.
 > Legend: severity `C`ritical / `H`igh / `M`edium / `L`ow · effort `S` (<1h) / `M` (half day) / `L` (multi-day)
-> IDs: `R-xx` = work item (next free: **R-94**) · `P-xx` = parked idea (next free: **P-07**)
+> IDs: `R-xx` = work item (next free: **R-96**) · `P-xx` = parked idea (next free: **P-07**)
 > Cross-product items (SSO, contracts, design tokens) live in `chadev-platform/ROADMAP.md`, not here.
-> Updated: 2026-09-09
+> Updated: 2026-09-10
 
 ---
 
@@ -42,10 +42,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 ---
 
 ## ⏭ NEXT — "easier to improve" foundation (order matters: helpers → splits → types)
-
-- [ ] **R-92** slowapi 429 handler still returns `{"error": "<string>"}` — the one response outside the
-      R-27 envelope. Custom handler → `error_body("rate_limited", …)`; keys per tenant, not only per IP. — `L` / `S`
-      `backend/app/limiter.py` · `backend/app/main.py`
 
 - [ ] **R-48** Shared helpers across routers: paginated-response wrapper, uniform error shape,
       tenant-scoped query helper. Prereq for R-46 and R-86. — `M` / `S`
@@ -185,6 +181,9 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-95** ✅ 2026-09-10 — Test that the 500 envelope carries `error.code=internal_error` + `detail` and hides the exception text. Tests 50 → **51**.
+- **R-94** ✅ 2026-09-10 — Frontend reads `error.message` via `lib/errors.ts` (`getApiErrorMessage`/`getRequestId`); every direct `detail` read replaced, global toast appends `(Ref: <request_id>)` on 5xx. Unblocks dropping `detail`.
+- **R-92** ✅ 2026-09-10 — slowapi 429 in the envelope: `error.code=rate_limited` + `retry_after`, `Retry-After` header, legacy `detail`. Per-tenant keys still open. Tests 49 → **50**.
 - **R-93** ✅ 2026-09-10 — Access token carries `role` + `jti` (platform auth contract, additive). Tests 48 → **49**.
 - **R-42** ✅ 2026-09-10 — `react-router-dom` ^6.30 → ^7.18 (only `BrowserRouter/Routes/Link/useNavigate/useParams/useLocation` used, no API change). `npm audit` = 0 vulnerabilities. tsc · lint · build green; e2e to be run by owner.
 - **R-89** ✅ 2026-09-09 — `/docs`, `/redoc`, `/openapi.json` disabled when `APP_ENV=production`. 4 tests.
@@ -223,4 +222,4 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 | 4 | UX / a11y / frontend | not started: R-24, R-60, R-62, R-61, R-88, R-25, R-23, R-29 |
 | 5 | Testing & reliability | scaffold done; open: R-21, R-22, R-49, R-51, R-52, R-57 |
 | 6 | DX & tooling | CI/docker/scripts done; open: R-78, R-79, R-80, R-81, R-63, R-64, R-30 |
-| 4b | Observability | open: R-92, R-75, R-84 |
+| 4b | Observability | ✅ R-92 · open: R-75, R-84 |
