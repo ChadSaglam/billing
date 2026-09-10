@@ -23,25 +23,14 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## 🔥 NOW — do these in order (one at a time)
 
-- [ ] **R-35** `test.pdf` and `test_export.csv` are tracked at the repo root — test artifacts in version control. — `L` / `S`
-      **Reopened 2026-09-04: still committed (26,170 B / 2,399 B). `git rm` + already gitignored.**
-- [ ] **R-67** `send_document_email_endpoint` passes ORM objects (`doc`, `company`) into a
-      BackgroundTask — after `db.commit()` and session close they are expired → DetachedInstanceError
-      in production. Extract plain values before queueing. Tests pass today only because TestClient
-      keeps the session alive. — `H` / `S`
-      `backend/app/api/documents.py` · `backend/app/services/email_sender.py`
-- [ ] **R-68** PDF hardcodes `CHF` on every line item and totals row in **both** templates, while
-      `document.currency` can be EUR (R-12). Printed invoices can show the wrong currency —
-      legal-document bug. — `H` / `S`
-      `backend/app/services/pdf_generator.py`
+- [ ] **R-96** Drop the legacy top-level `detail` from error responses in **2.6.0** (contract:
+      chadev-platform/contracts/errors.md). No first-party reader left after R-94; flag in release notes. — `M` / `S`
+      `backend/app/core/errors.py` · `backend/app/limiter.py`
 
 ---
 
 ## ⏭ NEXT — "easier to improve" foundation (order matters: helpers → splits → types)
 
-- [ ] **R-96** Drop the legacy top-level `detail` from error responses in **2.6.0** (contract:
-      chadev-platform/contracts/errors.md). No first-party reader left after R-94; flag in release notes. — `M` / `S`
-      `backend/app/core/errors.py` · `backend/app/limiter.py`
 - [ ] **R-46** Split `documents.py` (661 lines — 4× the next-largest router). Slices, tests green
       after each: 1) helpers (`_build_line_item`, `_recalc_totals`, `_get_doc`, `_load_full`,
       `_get_settings`, `_calc_next_recurrence`) → `services/document_service.py` · 2) routes → CRUD /
@@ -59,8 +48,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       `backend/app/api/clients.py:14` · `backend/app/api/documents.py`
 - [ ] **R-71** Duplicate `(tenant_id, document_number)` → unhandled IntegrityError → 500 instead of 409,
       on create / duplicate / convert paths. One exception handler + test. — `M` / `S`
-- [ ] **R-73** `bulk_send_email` sends SMTP synchronously in-request while single-send uses
-      BackgroundTasks → timeouts on bulk. Unify on the background path (needs R-67 first). — `M` / `S`
 - [ ] **R-74** `preview_pdf` mutates `settings.pdf_template` in-session and relies on `db.expire`.
       Pass template as an argument instead. — `L` / `S`
 - [ ] **R-77** Swiss cross in the QR code drawn with per-pixel `putpixel` loops —
@@ -85,8 +72,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       execute in Excel. Prefix-escape text cells. — `M` / `S`
 - [ ] **R-76** CSV export has no required date bound and joinedloads items+client for the full
       history → memory spike. Require a date range (or stream with `yield_per`). — `M` / `S`
-- [ ] **R-75** `/api/health` exposes disk usage + migration revision unauthenticated — needed by CI
-      (R-41); trim to status+db when `APP_ENV=production`; add `version` + `storage` backend. — `L` / `S`
 - [ ] **R-55** Backup/restore script + documented restore drill. — `H` / `M`
 - [ ] **R-56** FK `ondelete` + NOT NULL audit for tenant cascades. — `M` / `M`
       `backend/app/models/`
@@ -116,10 +101,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 - [ ] **R-82** `get_current_user` does 2 extra queries per request (User, then Tenant). Join or
       `joinedload(User.tenant)`. — `L` / `S`
       `backend/app/auth.py:86-92`
-- [ ] **R-84** Background jobs (overdue, recurring) run inside the API process via asyncio loop.
-      Advisory lock makes it safe, but job uptime = API uptime and a slow job blocks the event loop
-      thread pool. Move to a separate `python -m app.jobs` container in compose. — `M` / `M`
-      `backend/app/main.py:61-91`
 - [ ] **R-59** Route-level code splitting (lazy pages) + bundle budget check in CI. — `M` / `M`
 
 ### UX / a11y / frontend ("dynamic, professional, user-friendly")
@@ -176,6 +157,13 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-84** ✅ 2026-09-10 — Scheduled jobs (overdue, recurring) live in `services/jobs.py`; `python -m app.jobs` is a dedicated runner (`--once` for a single pass, `JOBS_INTERVAL_SECONDS` loop otherwise). API runs them in-process only when `RUN_JOBS_IN_API=true` (default — local dev unchanged); compose sets it `false` on `backend` and adds a `jobs` service on the same image, so Docker has exactly one runner. Job pass runs in a thread, no longer on the event loop. README "Background jobs". Tests 112 → **116**.
+- **R-75** ✅ 2026-09-10 — `/api/health` contract: `status`, `version`, `database`, `migration`, `storage`, `jobs` (`in-api` | `worker`); `disk` only when `APP_ENV != production`. CI keys (`database`, `migration`) unchanged. Tests → **120**.
+- **R-67** ✅ 2026-09-10 — `send_document_email_endpoint` queues a frozen `DocumentEmail` dataclass (plain values, built in-request via `DocumentEmail.from_document`) instead of ORM instances; the background send needs no session, so no DetachedInstanceError after commit.
+- **R-73** ✅ 2026-09-10 — `bulk_send_email` renders PDFs in-request and queues one background batch (`send_document_emails`, keeps going past individual failures). **Contract change:** response `{sent, errors}` → `{queued, errors}`; frontend toast updated. Also fixed: `POST /{doc_id}/send-email` was declared before `/bulk/send-email`, so every bulk send answered 422 (`doc_id="bulk"`). Tests → **124**.
+- **R-35** ✅ 2026-09-10 — `test.pdf` / `test_export.csv` removed from the repo root (`git rm`; already gitignored, unreferenced).
+- **R-68** ✅ 2026-09-10 — PDF prints `document.currency` on every line item, subtotal, discount and total in both templates and in the QR payload (`_currency()` helper). Regression test: EUR invoice, both templates, "EUR" present / "CHF" absent. Tests → **126**.
+
 - **R-19b** ✅ 2026-09-10 — billing owns its own port family: 5000 frontend / 9000 API / 9432 Postgres host port (e2e 5100 / 9100), so it runs next to buchhaltung (3000 / 8000 / 5432) with zero overlap. `test.sh` and `project-overview.sh` derive every URL and the port-conflict list from `.env`; Playwright no longer reads the root `.env` (`E2E_API_URL` / `E2E_FRONTEND_PORT`). Container-internal 8000 / 5173 / 5432 unchanged. Ports table in README.
 - **R-22** ✅ 2026-09-10 — `e2e/billing-flow.spec.ts` is a real happy path: register a tenant via UI → onboarding → client → two-line Rechnung (asserts CHF 270.25) → Vorschau (`/preview` 200 `application/pdf`) → `/pdf` with the session token. `playwright.config.ts` fixed for ESM (`__dirname` crashed before any test). CI job `e2e`: Postgres service, `alembic upgrade head`, uvicorn :8000, Playwright with its own Vite dev server. Portal/multi-tenant specs continue as R-100.
 - **R-21** ✅ 2026-09-10 — vitest 4.1.11 (`npm run test`, in the frontend CI job). 21 tests in `src/test/`: `lib/errors.ts` fallback chain, `line-item-utils` (`calculateTotals`/`lineTotal` extracted from `LineItemsEditor`), `lib/optimistic.ts` rollback.
@@ -223,10 +211,10 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 |---|---|---|
 | 0 | Recon / system map | ✅ done (re-verified 2026-09-04) |
 | 0.5 | Risk fixes before platform work | ✅ R-89, R-27, R-91, R-90 (branch `feat/phase0-risks`, 2026-09-09) |
-| 1 | Architecture & code quality | audit done (R-45), R-48 helpers ✅, R-66 ✅ · NEXT: R-46 → R-47 → R-85 → R-86 |
-| 2 | Security & data protection | core done, R-83 step 1 + R-92b ✅; open: R-15b, R-83b, R-53, R-65, R-75, R-76, R-55, R-56 |
-| 3 | Performance | not started: R-26, R-58, R-82, R-84, R-59 |
+| 1 | Architecture & code quality | audit done (R-45), R-48 helpers ✅, R-66, R-67, R-73, R-68, R-35 ✅ · NEXT: R-96 → R-46 → R-47 → R-85 → R-86 |
+| 2 | Security & data protection | core done, R-83 step 1 + R-92b + R-75 ✅; open: R-15b, R-83b, R-53, R-65, R-76, R-55, R-56 |
+| 3 | Performance | R-84 ✅; open: R-26, R-58, R-82, R-59 |
 | 4 | UX / a11y / frontend | not started: R-24, R-60, R-62, R-61, R-88, R-25, R-23, R-29 |
 | 5 | Testing & reliability | R-21, R-22, R-49, R-51 ✅; open: R-52, R-57, R-98, R-99, R-100 |
 | 6 | DX & tooling | CI/docker/scripts done; open: R-78, R-79, R-80, R-81, R-63, R-64, R-30 |
-| 4b | Observability | ✅ R-92 · open: R-75, R-84 |
+| 4b | Observability | ✅ R-92, R-75, R-84 |
