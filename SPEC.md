@@ -343,12 +343,17 @@ Based on actual ChaDev invoices:
 
 ## Environment Variables
 
+See `.env.example` for the full list. Ports default to 5000 (frontend),
+9000 (API) and 9432 (Postgres host port); the e2e stack uses 5100 / 9100.
+
 ```env
-# Backend
-DATABASE_URL=postgresql://chadev:chadev@db:5432/chadev_billing
+# Backend (inside compose the DB is always db:5432)
+DATABASE_URL=postgresql://chadev:change-me@localhost:9432/billing
+ALLOWED_ORIGINS=http://localhost:5000
+FRONTEND_URL=http://localhost:5000
 
 # Frontend
-VITE_API_URL=http://localhost:8002
+VITE_API_URL=http://localhost:9000
 ```
 
 ## License

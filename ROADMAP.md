@@ -65,7 +65,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       Pass template as an argument instead. — `L` / `S`
 - [ ] **R-77** Swiss cross in the QR code drawn with per-pixel `putpixel` loops —
       `PIL.ImageDraw.rectangle` does it in ~6 lines. — `L` / `S`
-- [ ] **R-19b** Verify `test.sh` / `project-overview.sh` no longer hardcode 5173/8001. — `L` / `S`
 
 ---
 
@@ -177,6 +176,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-19b** ✅ 2026-09-10 — billing owns its own port family: 5000 frontend / 9000 API / 9432 Postgres host port (e2e 5100 / 9100), so it runs next to buchhaltung (3000 / 8000 / 5432) with zero overlap. `test.sh` and `project-overview.sh` derive every URL and the port-conflict list from `.env`; Playwright no longer reads the root `.env` (`E2E_API_URL` / `E2E_FRONTEND_PORT`). Container-internal 8000 / 5173 / 5432 unchanged. Ports table in README.
 - **R-22** ✅ 2026-09-10 — `e2e/billing-flow.spec.ts` is a real happy path: register a tenant via UI → onboarding → client → two-line Rechnung (asserts CHF 270.25) → Vorschau (`/preview` 200 `application/pdf`) → `/pdf` with the session token. `playwright.config.ts` fixed for ESM (`__dirname` crashed before any test). CI job `e2e`: Postgres service, `alembic upgrade head`, uvicorn :8000, Playwright with its own Vite dev server. Portal/multi-tenant specs continue as R-100.
 - **R-21** ✅ 2026-09-10 — vitest 4.1.11 (`npm run test`, in the frontend CI job). 21 tests in `src/test/`: `lib/errors.ts` fallback chain, `line-item-utils` (`calculateTotals`/`lineTotal` extracted from `LineItemsEditor`), `lib/optimistic.ts` rollback.
 - **R-72** ✅ 2026-09-10 — `_esc()` + `_Escaped` proxy in `pdf_generator.py`: names, addresses, UID, notes and QR-slip text are XML-escaped before `Paragraph`. "Bold <b> Bauer" no longer 500s and "<Holding>" is printed instead of dropped. pypdf added to dev requirements for text assertions.

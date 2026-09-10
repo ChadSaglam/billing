@@ -27,32 +27,48 @@ Invoice and quote management software for **ChaDev** — built with FastAPI, Rea
 
 ---
 
+## Ports
+
+billing owns its own port family so it can run next to buchhaltung
+(3000 / 8000 / 5432) with nothing overlapping. Every value is an
+environment variable with the default shown; `.env` overrides all of them.
+
+| Service      | Dev (`scripts/dev.sh`) | Docker (host port)          | E2E (Playwright)              |
+|--------------|------------------------|-----------------------------|-------------------------------|
+| Frontend     | `FRONTEND_PORT` 5000   | `FRONTEND_PORT` 5000 → 5173 | `E2E_FRONTEND_PORT` 5100      |
+| Backend API  | `BACKEND_PORT` 9000    | `BACKEND_PORT` 9000 → 8000  | `E2E_API_URL` localhost:9100  |
+| PostgreSQL   | `DB_PORT` 9432         | `DB_PORT` 9432 → 5432       | whatever `DATABASE_URL` says  |
+
+Container-internal ports (right of the arrow) never change: uvicorn always
+listens on 8000, the vite dev server on 5173 and Postgres on 5432 inside
+the compose network. The e2e stack uses its own ports so a running dev
+stack is never touched by a Playwright run.
+
+---
+
 ## Quick Start (Docker)
 
 ```bash
 cd billing
+cp .env.example .env        # then set POSTGRES_PASSWORD and SECRET_KEY
 
 # Build and start all services
-docker-compose up --build
-
-# Seed the database with sample clients, invoices, and service templates
-curl -X POST http://localhost:8001/api/seed
+docker compose up --build
 ```
 
 Open your browser:
 
-| Service       | URL                           |
-|---------------|-------------------------------|
-| Frontend      | http://localhost:5173          |
-| Backend API   | http://localhost:8001          |
-| API Docs      | http://localhost:8001/docs     |
+| Service       | URL                        |
+|---------------|----------------------------|
+| Frontend      | http://localhost:5000      |
+| Backend API   | http://localhost:9000      |
+| API Docs      | http://localhost:9000/docs |
 
 ### Rebuild after code changes
 
 ```bash
-docker-compose down -v          # -v removes volumes (resets database)
-docker-compose up --build
-curl -X POST http://localhost:8001/api/seed
+docker compose down -v          # -v removes volumes (resets database)
+docker compose up --build
 ```
 
 > **Note:** Services (16 templates) are auto-seeded on startup. The `/api/seed` endpoint creates sample clients and invoices.
@@ -63,26 +79,23 @@ curl -X POST http://localhost:8001/api/seed
 From the project root:
 
 ```bash
-./scripts/local-dev.sh
+./scripts/dev.sh            # auto: docker if available, else local
+./scripts/dev.sh docker     # postgres + backend in docker, vite on host
+./scripts/dev.sh local      # postgres on host, uvicorn in venv, vite on host
 ```
-
-This starts:
-- PostgreSQL connectivity checks
-- FastAPI backend
-- Vite frontend
 
 Open:
 
 | Service     | URL |
 |-------------|-----|
-| Frontend    | http://localhost:5173 |
-| Backend API | http://localhost:8002 |
-| API Docs    | http://localhost:8002/docs |
+| Frontend    | http://localhost:5000 |
+| Backend API | http://localhost:9000 |
+| API Docs    | http://localhost:9000/docs |
 
-Run the smoke tests in another terminal:
+Run the checks in another terminal:
 
 ```bash
-BACKEND_PORT=8002 ./scripts/local-test.sh
+./scripts/test.sh
 ```
 ---
 ## Seed sample data
@@ -92,7 +105,7 @@ The seed endpoint requires authentication. First register or log in, then call `
 ### Register a local user
 
 ```bash
-curl -X POST http://localhost:8002/api/auth/register \
+curl -X POST http://localhost:9000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"***REMOVED***","password":"***REMOVED***","full_name":"Chad Saglam","company_name":"ChaDev"}'
 ```
@@ -100,7 +113,7 @@ curl -X POST http://localhost:8002/api/auth/register \
 ### Log in
 
 ```bash
-TOKEN=$(curl -sf -X POST http://localhost:8002/api/auth/login \
+TOKEN=$(curl -sf -X POST http://localhost:9000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"***REMOVED***","password":"***REMOVED***"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
@@ -109,7 +122,7 @@ TOKEN=$(curl -sf -X POST http://localhost:8002/api/auth/login \
 ### Run seed
 
 ```bash
-curl -X POST http://localhost:8002/api/seed \
+curl -X POST http://localhost:9000/api/seed \
   -H "Authorization: Bearer $TOKEN"
 ```
 ---
@@ -118,26 +131,39 @@ curl -X POST http://localhost:8002/api/seed \
 
 ### Prerequisites
 
-- Python 3.13
+- Python 3.12
 - Node.js + npm
-- PostgreSQL running locally on `localhost:5432`
-- A project `.env` file at the repo root
+- PostgreSQL reachable at the host/port in `DATABASE_URL` (default `localhost:9432`)
+- A project `.env` file at the repo root (`cp .env.example .env`)
 
 ### Start everything
 
 ```bash
-./scripts/local-dev.sh
+./scripts/dev.sh local
 ```
 
 ### Run checks
 
 ```bash
-BACKEND_PORT=8002 ./scripts/local-test.sh
+./scripts/test.sh
+```
+
+### End-to-end tests
+
+The Playwright run starts its own vite dev server on 5100 and expects an API
+on 9100, so it never collides with a dev stack on 5000 / 9000:
+
+```bash
+cd backend
+DATABASE_URL=postgresql://.../billing_e2e ALLOWED_ORIGINS=http://localhost:5100 \
+  FRONTEND_URL=http://localhost:5100 APP_ENV=test \
+  python -m uvicorn app.main:app --port 9100 &
+cd ../frontend && npx playwright test
 ```
 
 ### Stop everything
 
-Press `Ctrl+C` in the terminal running `local-dev.sh`.
+Press `Ctrl+C` in the terminal running `dev.sh`.
 
 ## Project Structure
 
