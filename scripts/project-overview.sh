@@ -37,9 +37,9 @@ fi
 
 # ── Everything derived, nothing hardcoded ─────────────────────────────
 COMPOSE="docker compose"
-BACKEND_PORT="${BACKEND_PORT:-8000}"
-FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-DB_PORT="${DB_PORT:-5432}"
+BACKEND_PORT="${BACKEND_PORT:-9000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5000}"
+DB_PORT="${DB_PORT:-9432}"
 DB_USER="${POSTGRES_USER:-postgres}"
 DB_NAME="${POSTGRES_DB:-postgres}"
 APP_NAME="${APP_NAME:-billing}"

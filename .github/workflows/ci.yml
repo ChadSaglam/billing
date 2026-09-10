@@ -36,7 +36,7 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/billing_test
       TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/billing_test
       SECRET_KEY: ci-only-secret-not-used-in-production
-      ALLOWED_ORIGINS: http://localhost:5173
+      ALLOWED_ORIGINS: http://localhost:5000
     defaults:
       run:
         working-directory: backend
@@ -121,7 +121,7 @@ jobs:
       - name: Production build
         run: npm run build
         env:
-          VITE_API_URL: http://localhost:8001
+          VITE_API_URL: http://localhost:9000
 
       - uses: actions/upload-artifact@v4
         with:
@@ -146,10 +146,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/billing_e2e
       SECRET_KEY: ci-only-secret-not-used-in-production
-      ALLOWED_ORIGINS: http://localhost:5173
-      FRONTEND_URL: http://localhost:5173
+      # e2e stack: 5100 frontend / 9100 API (dev stack is 5000 / 9000).
+      ALLOWED_ORIGINS: http://localhost:5100
+      FRONTEND_URL: http://localhost:5100
       APP_ENV: test
-      VITE_API_URL: http://localhost:8000
+      E2E_API_URL: http://localhost:9100
     steps:
       - uses: actions/checkout@v4
 
@@ -175,12 +176,12 @@ jobs:
         working-directory: backend
         run: |
           alembic upgrade head
-          nohup python -m uvicorn app.main:app --port 8000 > /tmp/uvicorn.log 2>&1 &
+          nohup python -m uvicorn app.main:app --port 9100 > /tmp/uvicorn.log 2>&1 &
           for i in $(seq 1 30); do
-            curl -fsS http://localhost:8000/api/health && break
+            curl -fsS http://localhost:9100/api/health && break
             sleep 1
           done
-          curl -fsS http://localhost:8000/api/health
+          curl -fsS http://localhost:9100/api/health
 
       - name: Install frontend
         working-directory: frontend
@@ -240,13 +241,13 @@ jobs:
           POSTGRES_USER=chadev
           POSTGRES_PASSWORD=ci-password
           POSTGRES_DB=billing
-          DB_PORT=9202
-          BACKEND_PORT=9201
-          FRONTEND_PORT=9200
+          DB_PORT=9432
+          BACKEND_PORT=9000
+          FRONTEND_PORT=5000
           SECRET_KEY=ci-only-secret-not-used-in-production
-          ALLOWED_ORIGINS=http://localhost:9200
-          FRONTEND_URL=http://localhost:9200
-          VITE_API_URL=http://localhost:9201
+          ALLOWED_ORIGINS=http://localhost:5000
+          FRONTEND_URL=http://localhost:5000
+          VITE_API_URL=http://localhost:9000
           ENVEOF
 
       - name: docker compose config is valid
@@ -271,7 +272,7 @@ jobs:
 
       - name: Backend is healthy and migrated
         run: |
-          curl -fsS http://localhost:9201/api/health | tee /tmp/health.json
+          curl -fsS http://localhost:9000/api/health | tee /tmp/health.json
           python3 - <<'PY'
           import json
           h = json.load(open("/tmp/health.json"))
@@ -283,7 +284,7 @@ jobs:
           PY
 
       - name: Frontend is serving
-        run: curl -fsS http://localhost:9200 | head -c 200
+        run: curl -fsS http://localhost:5000 | head -c 200
 
       - name: Dump logs on failure
         if: failure()

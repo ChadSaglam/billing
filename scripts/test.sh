@@ -21,10 +21,6 @@ CYAN="\033[36m"; GREEN="\033[32m"; RED="\033[31m"; YELLOW="\033[33m"; DIM="\033[
 ERRORS=0; WARNINGS=0; PASSED=0
 
 COMPOSE="docker compose"
-BACKEND_URL="http://localhost:8001"
-FRONTEND_URL="http://localhost:5173"
-DB_USER="${POSTGRES_USER:-chadev}"
-DB_NAME="${POSTGRES_DB:-chadev_billing}"
 
 # NOTE: deliberately NOT `set -a`. Exporting .env into the environment breaks
 # JSON-valued settings — bash strips the quotes from ALLOWED_ORIGINS=["..."],
@@ -33,6 +29,15 @@ DB_NAME="${POSTGRES_DB:-chadev_billing}"
 if [[ -f ".env" ]]; then
   source .env
 fi
+
+# Ports come from .env; defaults match .env.example (5000 / 9000 / 9432).
+BACKEND_PORT="${BACKEND_PORT:-9000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5000}"
+DB_PORT="${DB_PORT:-9432}"
+BACKEND_URL="http://localhost:${BACKEND_PORT}"
+FRONTEND_URL="http://localhost:${FRONTEND_PORT}"
+DB_USER="${POSTGRES_USER:-chadev}"
+DB_NAME="${POSTGRES_DB:-billing}"
 
 # Determine which sections to run
 REQUESTED_SECTIONS=("$@")
@@ -401,7 +406,7 @@ if should_run "frontend-live"; then
 echo -e "${BOLD}8. Frontend${RESET}"
 
 if curl -sf "${FRONTEND_URL}" > /dev/null 2>&1; then
-  pass "Frontend dev server running (port 5173)"
+  pass "Frontend dev server running (port ${FRONTEND_PORT})"
 else
   warn "Frontend not reachable at ${FRONTEND_URL}"
 fi
@@ -413,7 +418,7 @@ fi
 if should_run "ports"; then
 echo -e "${BOLD}9. Port Conflicts${RESET}"
 
-for port in 5434 8001 5173; do
+for port in "$DB_PORT" "$BACKEND_PORT" "$FRONTEND_PORT"; do
   listeners=$(lsof -i :"$port" -sTCP:LISTEN 2>/dev/null | grep -cv "^COMMAND" 2>/dev/null || echo "0")
   listeners="${listeners//[^0-9]/}"
   [[ -z "$listeners" ]] && listeners=0

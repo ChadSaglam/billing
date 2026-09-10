@@ -7,7 +7,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
  * and leaves nothing that a later run could collide with.
  */
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = process.env.E2E_API_URL || 'http://localhost:9100';
 
 const run = Date.now().toString(36);
 const tenant = {

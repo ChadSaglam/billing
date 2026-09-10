@@ -51,9 +51,9 @@ class Settings(BaseSettings):
     # a version floor. Keeping the field a plain string sidesteps the decoder
     # entirely and works on every version; `allowed_origins` below is the
     # parsed value callers should use. (R-36)
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5000"
 
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = "http://localhost:5000"
 
     SMTP_HOST: str = ""
     SMTP_PORT: int = 465
