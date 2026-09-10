@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.auth import get_tenant_id, require_editor
@@ -9,6 +9,7 @@ from app.schemas.service_template import (
     ServiceTemplateRead,
     ServiceTemplateUpdate,
 )
+from app.services.tenancy import get_or_404, scoped
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -20,7 +21,7 @@ def list_services(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
-    q = db.query(ServiceTemplate).filter(ServiceTemplate.tenant_id == tenant_id)
+    q = scoped(db, ServiceTemplate, tenant_id)
     if active_only:
         q = q.filter(ServiceTemplate.is_active.is_(True))
     if category:
@@ -44,9 +45,7 @@ def update_service(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
-    svc = db.query(ServiceTemplate).filter(ServiceTemplate.id == service_id, ServiceTemplate.tenant_id == tenant_id).first()
-    if not svc:
-        raise HTTPException(status_code=404, detail="Service not found")
+    svc = get_or_404(db, ServiceTemplate, service_id, tenant_id, detail="Service not found")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(svc, key, value)
     db.commit()
@@ -56,8 +55,6 @@ def update_service(
 
 @router.delete("/{service_id}", status_code=204, dependencies=[Depends(require_editor)])
 def delete_service(service_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    svc = db.query(ServiceTemplate).filter(ServiceTemplate.id == service_id, ServiceTemplate.tenant_id == tenant_id).first()
-    if not svc:
-        raise HTTPException(status_code=404, detail="Service not found")
+    svc = get_or_404(db, ServiceTemplate, service_id, tenant_id, detail="Service not found")
     db.delete(svc)
     db.commit()
