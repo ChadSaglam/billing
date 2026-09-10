@@ -55,6 +55,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description Revoke a refresh token (R-16).
+         *
+         *     Deliberately unauthenticated and quiet: it must work even when the
+         *     access token has already expired, and it must not become an oracle for
+         *     token validity — unknown or already-revoked tokens get the same 204.
+         */
+        post: operations["logout_api_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/me": {
         parameters: {
             query?: never;
@@ -255,7 +279,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Preview Pdf */
+        /**
+         * Preview Pdf
+         * @description Render a document with a chosen template, without persisting the choice.
+         *
+         *     Authentication is a normal Authorization header. It previously accepted
+         *     the JWT as a `?token=` query parameter — which lands in access logs,
+         *     browser history and Referer headers — and derived the tenant from the
+         *     token's `tid` claim instead of the database (R-06).
+         */
         get: operations["preview_pdf_api_documents__doc_id__preview_get"];
         put?: never;
         post?: never;
@@ -377,7 +409,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Upload Logo */
+        /**
+         * Upload Logo
+         * @description Store a tenant logo.
+         *
+         *     Validates the declared content type, the real image content and the size,
+         *     and generates the filename itself. Previously it trusted the client's
+         *     filename extension and wrote unbounded bytes to disk (R-09).
+         */
         post: operations["upload_logo_api_settings_logo_post"];
         delete?: never;
         options?: never;
@@ -550,7 +589,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Seed Data */
+        /**
+         * Seed Data
+         * @description Demo data. Not registered when APP_ENV=production (R-08).
+         */
         post: operations["seed_data_api_seed_post"];
         delete?: never;
         options?: never;
@@ -564,10 +606,7 @@ export interface components {
     schemas: {
         /** Body_upload_logo_api_settings_logo_post */
         Body_upload_logo_api_settings_logo_post: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: string;
         };
         /** BulkActionRequest */
@@ -613,6 +652,20 @@ export interface components {
             country: string;
             /** Notes */
             notes?: string | null;
+        };
+        /**
+         * ClientPage
+         * @description Paginated envelope for the list endpoint (R-13).
+         */
+        ClientPage: {
+            /** Items */
+            items: components["schemas"]["ClientRead"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /** ClientRead */
         ClientRead: {
@@ -794,6 +847,20 @@ export interface components {
             created_at: string;
             client?: components["schemas"]["ClientRead"] | null;
         };
+        /**
+         * DocumentPage
+         * @description Paginated envelope for the list endpoint (R-13).
+         */
+        DocumentPage: {
+            /** Items */
+            items: components["schemas"]["DocumentListRead"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
         /** DocumentRead */
         DocumentRead: {
             /** Document Type */
@@ -807,11 +874,8 @@ export interface components {
             date: string;
             /** Due Date */
             due_date?: string | null;
-            /**
-             * Payment Terms Days
-             * @default 30
-             */
-            payment_terms_days: number;
+            /** Payment Terms Days */
+            payment_terms_days?: number | null;
             /**
              * Status
              * @default draft
@@ -898,16 +962,8 @@ export interface components {
             payment_terms_days?: number | null;
             /** Status */
             status?: string | null;
-            /** Subtotal */
-            subtotal?: number | string | null;
             /** Discount Percent */
             discount_percent?: number | string | null;
-            /** Discount Amount */
-            discount_amount?: number | string | null;
-            /** Vat Amount */
-            vat_amount?: number | string | null;
-            /** Total */
-            total?: number | string | null;
             /** Currency */
             currency?: string | null;
             /** Notes */
@@ -950,7 +1006,19 @@ export interface components {
             /** Temp Password */
             temp_password: string;
         };
-        /** LineItemCreate */
+        /**
+         * LineItemCreate
+         * @description Input only.
+         *
+         *     `total_price` is deliberately absent: it is quantity x unit_price and the
+         *     server computes it. Accepting it from the client meant a crafted request
+         *     could book CHF 500 of work as CHF 1, and the document subtotal, the VAT
+         *     and the QR-bill amount all inherited the forged figure (R-31).
+         *
+         *     `vat_rate` keeps a schema default for backwards compatibility, but the
+         *     server replaces it with the tenant's default_vat_rate whenever the
+         *     client did not send the field explicitly (R-12).
+         */
         LineItemCreate: {
             /** Position */
             position: number;
@@ -963,8 +1031,6 @@ export interface components {
             quantity: number | string;
             /** Unit Price */
             unit_price: number | string;
-            /** Total Price */
-            total_price: number | string;
             /**
              * Vat Rate
              * @default 8.10
@@ -989,8 +1055,6 @@ export interface components {
             quantity: string;
             /** Unit Price */
             unit_price: string;
-            /** Total Price */
-            total_price: string;
             /**
              * Vat Rate
              * @default 8.10
@@ -1005,6 +1069,8 @@ export interface components {
             id: number;
             /** Document Id */
             document_id: number;
+            /** Total Price */
+            total_price: string;
             /**
              * Created At
              * Format: date-time
@@ -1020,6 +1086,11 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** LogoutRequest */
+        LogoutRequest: {
+            /** Refresh Token */
+            refresh_token: string;
         };
         /** MonthlyRevenue */
         MonthlyRevenue: {
@@ -1046,7 +1117,7 @@ export interface components {
             /** Due Date */
             due_date?: string | null;
             /** Payment Terms Days */
-            payment_terms_days: number;
+            payment_terms_days?: number | null;
             /** Status */
             status: string;
             /** Subtotal */
@@ -1215,6 +1286,10 @@ export interface components {
             default_hourly_rate: string;
             /** Default Payment Terms Days */
             default_payment_terms_days: number;
+            /** Default Vat Rate */
+            default_vat_rate: string;
+            /** Default Currency */
+            default_currency: string;
             /** Logo Url */
             logo_url?: string | null;
             /** Next Invoice Number */
@@ -1258,6 +1333,10 @@ export interface components {
             default_hourly_rate?: number | string | null;
             /** Default Payment Terms Days */
             default_payment_terms_days?: number | null;
+            /** Default Vat Rate */
+            default_vat_rate?: number | string | null;
+            /** Default Currency */
+            default_currency?: string | null;
             /** Logo Url */
             logo_url?: string | null;
             /** Next Invoice Number */
@@ -1331,6 +1410,10 @@ export interface components {
             tenant_id: number;
             /** Tenant Name */
             tenant_name: string;
+            /** Subscription Plan */
+            subscription_plan: string;
+            /** Trial Ends At */
+            trial_ends_at: string | null;
         };
         /** UserUpdate */
         UserUpdate: {
@@ -1349,6 +1432,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
     };
     responses: never;
@@ -1458,6 +1545,37 @@ export interface operations {
             };
         };
     };
+    logout_api_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_me_api_auth_me_get: {
         parameters: {
             query?: never;
@@ -1482,6 +1600,8 @@ export interface operations {
         parameters: {
             query?: {
                 search?: string | null;
+                page?: number | null;
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -1495,7 +1615,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ClientRead"][];
+                    "application/json": components["schemas"]["ClientRead"][] | components["schemas"]["ClientPage"];
                 };
             };
             /** @description Validation Error */
@@ -1644,6 +1764,8 @@ export interface operations {
                 status?: string | null;
                 client_id?: number | null;
                 search?: string | null;
+                page?: number | null;
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -1657,7 +1779,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DocumentListRead"][];
+                    "application/json": components["schemas"]["DocumentListRead"][] | components["schemas"]["DocumentPage"];
                 };
             };
             /** @description Validation Error */
@@ -1996,7 +2118,6 @@ export interface operations {
         parameters: {
             query?: {
                 template?: string;
-                token?: string;
             };
             header?: never;
             path: {
