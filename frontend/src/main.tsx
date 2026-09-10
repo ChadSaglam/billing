@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { Toaster } from '@/components/Toaster';
 import { toast } from '@/hooks/use-toast';
+import { getApiErrorMessage, getApiErrorStatus, getRequestId } from '@/lib/errors';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -16,9 +17,11 @@ const queryClient = new QueryClient({
     },
     mutations: {
       onError: (error: unknown) => {
-        const msg =
-          (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-          || 'An unexpected error occurred';
+        let msg = getApiErrorMessage(error, 'An unexpected error occurred');
+        // Server-side failures are the ones support needs to correlate.
+        const status = getApiErrorStatus(error);
+        const requestId = getRequestId(error);
+        if (status !== undefined && status >= 500 && requestId) msg += ` (Ref: ${requestId})`;
         toast({ title: msg, variant: 'destructive' });
       },
     },

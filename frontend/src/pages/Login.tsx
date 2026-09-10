@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { login, register } from '@/lib/api';
 import { setToken } from '@/lib/auth';
+import { getApiErrorMessage } from '@/lib/errors';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -37,10 +38,7 @@ export default function Login() {
       setToken(result.access_token);
       navigate('/');
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-        || 'Something went wrong';
-      setError(msg);
+      setError(getApiErrorMessage(err, 'Something went wrong'));
     } finally {
       setLoading(false);
     }

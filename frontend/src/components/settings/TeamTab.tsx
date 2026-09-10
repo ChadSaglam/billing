@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTeamUsers, inviteUser, updateUser, removeUser, getMe } from '@/lib/api';
 import type { InviteUserPayload } from '@/types';
 import { toast } from '@/hooks/use-toast';
+import { getApiErrorMessage } from '@/lib/errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -24,10 +25,6 @@ const ROLE_META: Record<string, { label: string; icon: typeof Shield; color: str
 
 const EMPTY_INVITE: InviteUserPayload = { email: '', full_name: '', role: 'editor' };
 
-interface MutationError {
-  response?: { data?: { detail?: string }; status?: number };
-}
-
 export function TeamTab() {
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -48,10 +45,10 @@ export function TeamTab() {
       setTempPassword(res.temp_password);
       toast({ title: `${res.full_name} invited` });
     },
-    onError: (err: MutationError) => {
+    onError: (err: unknown) => {
       toast({
         title: 'Invite failed',
-        description: err.response?.data?.detail || 'Unknown error',
+        description: getApiErrorMessage(err, 'Unknown error'),
         variant: 'destructive',
       });
     },
@@ -64,8 +61,8 @@ export function TeamTab() {
       queryClient.invalidateQueries({ queryKey: ['team'] });
       toast({ title: 'User updated' });
     },
-    onError: (err: MutationError) => {
-      toast({ title: err.response?.data?.detail || 'Update failed', variant: 'destructive' });
+    onError: (err: unknown) => {
+      toast({ title: getApiErrorMessage(err, 'Update failed'), variant: 'destructive' });
     },
   });
 

@@ -12,9 +12,9 @@ import {
   updateDocumentStatusWithPayment, duplicateDocument,
 } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
-import { AxiosError } from 'axios';
 import { formatCurrency, formatDate, toNum } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { getApiErrorMessage } from '@/lib/errors';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,8 +101,8 @@ export default function DocumentDetail() {
       invalidate();
       toast({ title: `Email sent to ${data.recipient}` });
     },
-    onError: (err: AxiosError<{ detail?: string }>) => {
-      toast({ title: err?.response?.data?.detail || 'Failed to send email', variant: 'destructive' });
+    onError: (err: unknown) => {
+      toast({ title: getApiErrorMessage(err, 'Failed to send email'), variant: 'destructive' });
     },
   });
 
