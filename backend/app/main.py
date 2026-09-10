@@ -95,9 +95,19 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 @app.get("/api/health")
 def health(db: Session = Depends(get_db)):
-    import shutil
+    """Unauthenticated liveness/readiness probe (CI, compose healthcheck).
 
-    health = {"status": "ok"}
+    Always: status, version, database, migration, storage, jobs. Disk usage
+    is a capacity detail and only reported outside production (R-75).
+    """
+    health = {
+        "status": "ok",
+        "version": app.version,
+        "database": "unknown",
+        "migration": "unknown",
+        "storage": app_settings.STORAGE_BACKEND,
+        "jobs": "in-api" if app_settings.RUN_JOBS_IN_API else "worker",
+    }
 
     try:
         db.execute(text("SELECT 1"))
@@ -107,21 +117,23 @@ def health(db: Session = Depends(get_db)):
         health["status"] = "degraded"
 
     try:
-        usage = shutil.disk_usage(str(UPLOADS_DIR))
-        health["disk"] = {
-            "total_gb": round(usage.total / (1024**3), 2),
-            "free_gb": round(usage.free / (1024**3), 2),
-            "used_percent": round(usage.used / usage.total * 100, 1),
-        }
-    except Exception:
-        health["disk"] = "unavailable"
-
-    try:
-        result = db.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
-        row = result.fetchone()
+        row = db.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).fetchone()
         health["migration"] = row[0] if row else "none"
     except Exception:
         health["migration"] = "unknown"
+
+    if not _is_production:
+        import shutil
+
+        try:
+            usage = shutil.disk_usage(str(UPLOADS_DIR))
+            health["disk"] = {
+                "total_gb": round(usage.total / (1024**3), 2),
+                "free_gb": round(usage.free / (1024**3), 2),
+                "used_percent": round(usage.used / usage.total * 100, 1),
+            }
+        except Exception:
+            health["disk"] = "unavailable"
 
     return health
 
