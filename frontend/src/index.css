@@ -1,3 +1,6 @@
+/* Shared chadev design tokens (platform 1.6) — must come first so the
+   shadcn variables below can reference them. */
+@import './tokens.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tw-animate-css";
 @import "@fontsource-variable/geist";
@@ -37,7 +40,15 @@
     --border: 0 0% 90%;
     --input: 0 0% 90%;
     --ring: 0 0% 50%;
-    --radius: 0.625rem;
+    /* Mapped to the shared tokens where a 1:1 exists. The colour tokens are
+       hex while the shadcn variables are HSL triplets wrapped in hsl(), so
+       they stay local for now. Still unmapped: --background/--foreground
+       (--cd-color-bg/-fg), --muted-foreground (--cd-color-muted),
+       --border/--input (--cd-color-border), --primary (--cd-color-brand,
+       also a different hue), --destructive (--cd-color-danger),
+       success/warning (no shadcn counterpart), --cd-space-* (Tailwind
+       spacing scale), --cd-font-mono (Tailwind default mono stack). */
+    --radius: var(--cd-radius);
     --sidebar: 0 0% 97%;
     --sidebar-foreground: 0 0% 9%;
     --sidebar-primary: 0 0% 12%;

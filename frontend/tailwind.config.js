@@ -49,7 +49,8 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Inter stays the primary face; the shared token supplies the fallback stack.
+        sans: ['Inter', 'var(--cd-font-sans)'],
       },
       keyframes: {
         'accordion-down': {
