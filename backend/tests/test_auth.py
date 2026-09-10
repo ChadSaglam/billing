@@ -35,3 +35,18 @@ def test_refresh_token_cannot_be_used_as_access_token(client, make_tenant):
     ).json()
     headers = {"Authorization": f"Bearer {login['refresh_token']}"}
     assert client.get("/api/clients", headers=headers).status_code == 401
+
+
+def test_access_token_has_platform_claims(client, make_tenant):
+    """chadev-platform/contracts/auth.md: {sub, tid, role, type, exp, jti}."""
+    from jose import jwt
+
+    from app.config import settings
+
+    t = make_tenant()
+    token = t["headers"]["Authorization"].split()[1]
+    claims = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    assert {"sub", "tid", "role", "type", "exp", "jti"} <= set(claims)
+    assert claims["type"] == "access"
+    assert claims["role"] in ("owner", "admin", "editor", "viewer")
+    assert len(claims["jti"]) == 32

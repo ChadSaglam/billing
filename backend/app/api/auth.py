@@ -101,7 +101,7 @@ def register(request: Request, data: RegisterRequest, db: Session = Depends(get_
 
     db.add(CompanySettings(tenant_id=tenant.id, company_name=data.company_name))
 
-    access = create_access_token(user.id, tenant.id)
+    access = create_access_token(user.id, tenant.id, user.role)
     refresh_token = create_refresh_token(user.id, tenant.id, db)
     db.commit()
 
@@ -117,7 +117,7 @@ def login(request: Request, data: LoginRequest, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
-    access = create_access_token(user.id, user.tenant_id)
+    access = create_access_token(user.id, user.tenant_id, user.role)
     refresh_token = create_refresh_token(user.id, user.tenant_id, db)
     db.commit()
 
@@ -148,7 +148,7 @@ def refresh(request: Request, data: RefreshRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=401, detail="User not found or disabled")
 
     stored.revoked_at = datetime.now(UTC).replace(tzinfo=None)
-    access = create_access_token(user.id, user.tenant_id)
+    access = create_access_token(user.id, user.tenant_id, user.role)
     new_refresh = create_refresh_token(user.id, user.tenant_id, db)
     db.commit()
     return TokenResponse(access_token=access, refresh_token=new_refresh)

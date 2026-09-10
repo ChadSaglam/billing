@@ -24,9 +24,22 @@ def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain[:72].encode(), hashed.encode())
 
 
-def create_access_token(user_id: int, tenant_id: int) -> str:
+def create_access_token(user_id: int, tenant_id: int, role: str = "viewer") -> str:
+    """Access token in the platform claim shape {sub, tid, role, type, exp, jti}.
+
+    `role` and `jti` were added for the ChaDev platform contract
+    (chadev-platform/contracts/auth.md) so buchhaltung can verify the same
+    token. Additive — nothing reads them here yet.
+    """
     expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "tid": tenant_id, "exp": expire, "type": "access"}
+    payload = {
+        "sub": str(user_id),
+        "tid": tenant_id,
+        "role": role,
+        "type": "access",
+        "exp": expire,
+        "jti": uuid4().hex,
+    }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 

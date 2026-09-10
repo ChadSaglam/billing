@@ -2,7 +2,7 @@
 
 > One running list. Never duplicated — items move between sections, they don't get re-added.
 > Legend: severity `C`ritical / `H`igh / `M`edium / `L`ow · effort `S` (<1h) / `M` (half day) / `L` (multi-day)
-> IDs: `R-xx` = work item (next free: **R-93**) · `P-xx` = parked idea (next free: **P-07**)
+> IDs: `R-xx` = work item (next free: **R-94**) · `P-xx` = parked idea (next free: **P-07**)
 > Cross-product items (SSO, contracts, design tokens) live in `chadev-platform/ROADMAP.md`, not here.
 > Updated: 2026-09-09
 
@@ -185,6 +185,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-93** ✅ 2026-09-10 — Access token carries `role` + `jti` (platform auth contract, additive). Tests 48 → **49**.
 - **R-42** ✅ 2026-09-10 — `react-router-dom` ^6.30 → ^7.18 (only `BrowserRouter/Routes/Link/useNavigate/useParams/useLocation` used, no API change). `npm audit` = 0 vulnerabilities. tsc · lint · build green; e2e to be run by owner.
 - **R-89** ✅ 2026-09-09 — `/docs`, `/redoc`, `/openapi.json` disabled when `APP_ENV=production`. 4 tests.
 - **R-27** ✅ 2026-09-09 — JSON logging, `X-Request-ID` + `Server-Timing`, uniform error envelope
