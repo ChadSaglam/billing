@@ -299,7 +299,13 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     doc.vat_amount = vat_amount
     doc.total = total
 
-    if "date" in update_data or "payment_terms_days" in update_data:
+    # Derive the due date only when the caller did not set one explicitly and
+    # there are payment terms to derive it from (R-69).
+    if (
+        "due_date" not in update_data
+        and ("date" in update_data or "payment_terms_days" in update_data)
+        and doc.payment_terms_days is not None
+    ):
         doc.due_date = doc.date + timedelta(days=doc.payment_terms_days)
 
     if "recurrence" in update_data:

@@ -1,4 +1,4 @@
-"""Edit paths that used to corrupt or crash a document (R-66)."""
+"""Edit paths that used to corrupt or crash a document (R-66, R-69)."""
 import uuid
 from decimal import Decimal
 
@@ -53,3 +53,46 @@ def test_discount_only_update_recalculates_totals(client, make_tenant):
     # And it is persisted, not just echoed.
     again = client.get(f"/api/documents/{doc['id']}", headers=t["headers"]).json()
     assert Decimal(again["total"]) == Decimal("97.29")
+
+
+# ── R-69 ──────────────────────────────────────────────────────
+
+def test_update_with_null_payment_terms_does_not_crash(client, make_tenant):
+    t = make_tenant()
+    cid = _client(client, t["headers"])
+    doc = _invoice(client, t["headers"], cid)
+
+    resp = client.put(
+        f"/api/documents/{doc['id']}",
+        json={"payment_terms_days": None, "date": "2026-02-01"},
+        headers=t["headers"],
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["date"] == "2026-02-01"
+    # No terms → no computed due date, but no 500 either.
+    assert body["due_date"] is None or body["due_date"] >= "2026-02-01"
+
+
+def test_update_keeps_an_explicit_due_date(client, make_tenant):
+    t = make_tenant()
+    cid = _client(client, t["headers"])
+    doc = _invoice(client, t["headers"], cid)
+
+    resp = client.put(
+        f"/api/documents/{doc['id']}",
+        json={"date": "2026-02-01", "due_date": "2026-02-10"},
+        headers=t["headers"],
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["due_date"] == "2026-02-10"
+
+
+def test_update_recomputes_due_date_from_terms_when_not_sent(client, make_tenant):
+    t = make_tenant()
+    cid = _client(client, t["headers"])
+    doc = _invoice(client, t["headers"], cid, payment_terms_days=10)
+
+    resp = client.put(f"/api/documents/{doc['id']}", json={"date": "2026-02-01"}, headers=t["headers"])
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["due_date"] == "2026-02-11"

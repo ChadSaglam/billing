@@ -87,6 +87,8 @@ class StatusUpdate(BaseModel):
 class DocumentRead(DocumentBase):
     id: int
     document_number: str
+    # Nullable in the database; an update may clear the terms (R-69).
+    payment_terms_days: int | None = None
     converted_from_id: int | None = None
     paid_at: DateType | None = None
     payment_method: str | None = None
@@ -133,7 +135,7 @@ class PortalDocumentRead(BaseModel):
     document_number: str
     date: DateType
     due_date: DateType | None = None
-    payment_terms_days: int
+    payment_terms_days: int | None = None
     status: str
     subtotal: Decimal
     discount_percent: Decimal
