@@ -60,7 +60,7 @@ export default function Documents() {
     mutationFn: () => bulkSendEmail([...selected]),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-      toast({ title: `${data.sent} emails sent${data.errors.length ? `, ${data.errors.length} failed` : ''}` });
+      toast({ title: `${data.queued} emails queued${data.errors.length ? `, ${data.errors.length} failed` : ''}` });
       setSelected(new Set());
     },
   });

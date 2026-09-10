@@ -340,7 +340,7 @@ export const bulkUpdateStatus = async (payload: {
   return data;
 };
 
-export const bulkSendEmail = async (document_ids: number[]): Promise<{ sent: number; errors: string[] }> => {
+export const bulkSendEmail = async (document_ids: number[]): Promise<{ queued: number; errors: string[] }> => {
   const { data } = await api.post('/api/documents/bulk/send-email', { document_ids });
   return data;
 };

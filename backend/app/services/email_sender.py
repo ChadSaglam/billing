@@ -1,6 +1,9 @@
 import logging
 import smtplib
 import ssl
+from dataclasses import dataclass, field
+from datetime import date as date_type
+from decimal import Decimal
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -59,63 +62,110 @@ EMAIL_TEMPLATE = """\
 """
 
 
+@dataclass(frozen=True)
+class DocumentEmail:
+    """Everything the SMTP send needs, as plain values.
+
+    Built in the request (`from_document`) and handed to a BackgroundTask.
+    ORM instances must not cross that boundary: by the time the task runs
+    the session is committed and closed, so every attribute access on an
+    expired `Document` would raise DetachedInstanceError (R-67).
+    """
+
+    recipient_email: str
+    recipient_name: str
+    document_type: str
+    document_number: str
+    date: date_type | None
+    due_date: date_type | None
+    payment_terms_days: int | None
+    currency: str
+    total: Decimal
+    portal_token: str | None
+    company_name: str
+    company_phone: str | None
+    company_email: str | None
+    pdf_bytes: bytes = field(repr=False)
+
+    @classmethod
+    def from_document(
+        cls,
+        document,  # Document model instance
+        company,  # CompanySettings model instance
+        pdf_bytes: bytes,
+        recipient_email: str | None = None,
+        recipient_name: str | None = None,
+    ) -> "DocumentEmail":
+        return cls(
+            recipient_email=recipient_email or document.client.email,
+            recipient_name=recipient_name or document.client.company_name,
+            document_type=document.document_type,
+            document_number=document.document_number,
+            date=document.date,
+            due_date=document.due_date,
+            payment_terms_days=document.payment_terms_days,
+            currency=document.currency,
+            total=Decimal(document.total),
+            portal_token=document.portal_token,
+            company_name=company.company_name,
+            company_phone=company.phone,
+            company_email=company.email,
+            pdf_bytes=pdf_bytes,
+        )
+
+
 def _make_filename(document_type: str, document_number: str, recipient_name: str) -> str:
     type_label = "Rechnung" if document_type == "rechnung" else "Offerte"
     client_slug = recipient_name.replace(" ", "-").replace("/", "-")
     return f"{type_label}_{document_number}_{client_slug}.pdf"
 
 
-def send_document_email(
-    recipient_email: str,
-    recipient_name: str,
-    document,  # Document model instance
-    pdf_bytes: bytes,
-    company,  # CompanySettings model instance
-) -> None:
+def send_document_email(email: DocumentEmail) -> None:
+    """SMTP send. Safe to run in a BackgroundTask — needs no session."""
     if not settings.SMTP_HOST or not settings.SMTP_PASSWORD:
         raise RuntimeError("SMTP not configured — set SMTP_HOST and SMTP_PASSWORD in .env")
 
-    type_label = "Rechnung" if document.document_type == "rechnung" else "Offerte"
-    filename = _make_filename(document.document_type, document.document_number, recipient_name)
-    subject = f"{type_label} Nr. {document.document_number} — {company.company_name}"
+    type_label = "Rechnung" if email.document_type == "rechnung" else "Offerte"
+    filename = _make_filename(email.document_type, email.document_number, email.recipient_name)
+    subject = f"{type_label} Nr. {email.document_number} — {email.company_name}"
 
     portal_section = ""
-    if document.portal_token:
-        portal_url = f"{settings.FRONTEND_URL or 'http://localhost:5050'}/portal/{document.portal_token}"
+    if email.portal_token:
+        portal_url = f"{settings.FRONTEND_URL or 'http://localhost:5050'}/portal/{email.portal_token}"
         portal_section = f'<p>Sie können das Dokument auch online einsehen:</p><p><a class="btn" href="{portal_url}">Dokument online ansehen</a></p>'
 
     contact_parts = []
-    if company.phone:
-        contact_parts.append(f"Tel: {company.phone}")
-    if company.email:
-        contact_parts.append(f"E-Mail: {company.email}")
+    if email.company_phone:
+        contact_parts.append(f"Tel: {email.company_phone}")
+    if email.company_email:
+        contact_parts.append(f"E-Mail: {email.company_email}")
     contact_section = f'<p style="color:#6b7280;font-size:13px;margin-top:24px;">{" · ".join(contact_parts)}</p>' if contact_parts else ""
 
     def _fmt_amount(val):
         return f"{float(val):,.2f}".replace(",", "'")
 
     html_body = EMAIL_TEMPLATE.format(
-        company_name=company.company_name,
-        recipient_name=recipient_name,
+        company_name=email.company_name,
+        recipient_name=email.recipient_name,
         type_label=type_label,
-        document_number=document.document_number,
-        date=document.date.strftime("%d.%m.%Y") if document.date else "-",
-        due_date=document.due_date.strftime("%d.%m.%Y") if document.due_date else "-",
-        payment_terms=document.payment_terms_days,
-        currency=document.currency,
-        total=_fmt_amount(document.total),
+        document_number=email.document_number,
+        date=email.date.strftime("%d.%m.%Y") if email.date else "-",
+        due_date=email.due_date.strftime("%d.%m.%Y") if email.due_date else "-",
+        payment_terms=email.payment_terms_days,
+        currency=email.currency,
+        total=_fmt_amount(email.total),
         portal_section=portal_section,
         contact_section=contact_section,
     )
 
     msg = MIMEMultipart("mixed")
     msg["From"] = settings.FROM_EMAIL
-    msg["To"] = recipient_email
+    msg["To"] = email.recipient_email
     msg["Subject"] = subject
 
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    pdf_part = MIMEApplication(pdf_bytes, _subtype="pdf")
+    pdf_part = MIMEApplication(email.pdf_bytes, _subtype="pdf")
     pdf_part.add_header("Content-Disposition", "attachment", filename=filename)
     msg.attach(pdf_part)
 
@@ -124,4 +174,15 @@ def send_document_email(
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.send_message(msg)
 
-    logger.info(f"Email sent: {type_label} {document.document_number} → {recipient_email}")
+    logger.info("Email sent: %s %s → %s", type_label, email.document_number, email.recipient_email)
+
+
+def send_document_emails(emails: list[DocumentEmail]) -> None:
+    """Bulk background send: one failure must not stop the rest (R-73)."""
+    for email in emails:
+        try:
+            send_document_email(email)
+        except Exception:
+            logger.exception(
+                "Email failed: %s → %s", email.document_number, email.recipient_email
+            )

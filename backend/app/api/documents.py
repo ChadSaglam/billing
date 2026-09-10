@@ -527,50 +527,6 @@ def preview_pdf(
     )
 
 
-@router.post("/{doc_id}/send-email", dependencies=[Depends(require_editor)])
-@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
-def send_document_email_endpoint(
-    request: Request,
-    doc_id: int,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id),
-):
-    doc = _load_full(db, doc_id, tenant_id)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if not doc.client or not doc.client.email:
-        raise HTTPException(status_code=400, detail="Client has no email address")
-
-    company = _get_settings(db, tenant_id)
-    pdf_buffer = generate_invoice_pdf(doc, company)
-    pdf_buffer.seek(0)
-    pdf_bytes = pdf_buffer.read()
-
-    if not doc.portal_token:
-        doc.generate_portal_token()
-
-    recipient_email = doc.client.email
-    recipient_name = doc.client.company_name
-
-    from app.services.email_sender import send_document_email
-
-    background_tasks.add_task(
-        send_document_email,
-        recipient_email=recipient_email,
-        recipient_name=recipient_name,
-        document=doc,
-        pdf_bytes=pdf_bytes,
-        company=company,
-    )
-
-    if doc.status == "draft":
-        doc.status = "sent"
-    db.commit()
-
-    return {"message": "Email queued successfully", "recipient": recipient_email}
-
-
 # ── Bulk Actions ──────────────────────────────────────
 @router.post("/bulk/status", dependencies=[Depends(require_editor)])
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
@@ -600,7 +556,19 @@ def bulk_update_status(request: Request, data: BulkStatusRequest, db: Session = 
 
 @router.post("/bulk/send-email", dependencies=[Depends(require_editor)])
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
-def bulk_send_email(request: Request, data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def bulk_send_email(
+    request: Request,
+    data: BulkActionRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    """Queue one email per document; SMTP runs after the response (R-73).
+
+    PDFs are rendered in-request so data errors are reported synchronously;
+    only the network send is deferred. `queued` is the number handed to the
+    background sender, not the number delivered.
+    """
     docs = (
         scoped(db, Document, tenant_id)
         .options(joinedload(Document.line_items), joinedload(Document.client))
@@ -608,9 +576,9 @@ def bulk_send_email(request: Request, data: BulkActionRequest, db: Session = Dep
         .all()
     )
     company = _get_settings(db, tenant_id)
-    from app.services.email_sender import send_document_email
+    from app.services.email_sender import DocumentEmail, send_document_emails
 
-    sent = 0
+    emails: list[DocumentEmail] = []
     errors = []
     for doc in docs:
         if not doc.client or not doc.client.email:
@@ -621,21 +589,55 @@ def bulk_send_email(request: Request, data: BulkActionRequest, db: Session = Dep
                 doc.generate_portal_token()
             pdf_buffer = generate_invoice_pdf(doc, company)
             pdf_buffer.seek(0)
-            send_document_email(
-                recipient_email=doc.client.email,
-                recipient_name=doc.client.company_name,
-                document=doc,
-                pdf_bytes=pdf_buffer.read(),
-                company=company,
-            )
+            emails.append(DocumentEmail.from_document(doc, company, pdf_buffer.read()))
             if doc.status == "draft":
                 doc.status = "sent"
-            sent += 1
         except Exception as e:
             errors.append(f"{doc.document_number}: {str(e)}")
 
     db.commit()
-    return {"sent": sent, "errors": errors}
+    if emails:
+        background_tasks.add_task(send_document_emails, emails)
+    return {"queued": len(emails), "errors": errors}
+
+
+# Registered after /bulk/send-email on purpose: FastAPI matches routes in
+# declaration order, and `/{doc_id}/send-email` would otherwise capture
+# `/bulk/send-email` with doc_id="bulk" (422).
+@router.post("/{doc_id}/send-email", dependencies=[Depends(require_editor)])
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
+def send_document_email_endpoint(
+    request: Request,
+    doc_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    doc = _load_full(db, doc_id, tenant_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not doc.client or not doc.client.email:
+        raise HTTPException(status_code=400, detail="Client has no email address")
+
+    company = _get_settings(db, tenant_id)
+    pdf_buffer = generate_invoice_pdf(doc, company)
+    pdf_buffer.seek(0)
+    pdf_bytes = pdf_buffer.read()
+
+    if not doc.portal_token:
+        doc.generate_portal_token()
+
+    from app.services.email_sender import DocumentEmail, send_document_email
+
+    # Plain values only: the task runs after commit + session close (R-67).
+    email = DocumentEmail.from_document(doc, company, pdf_bytes)
+    background_tasks.add_task(send_document_email, email)
+
+    if doc.status == "draft":
+        doc.status = "sent"
+    db.commit()
+
+    return {"message": "Email queued successfully", "recipient": email.recipient_email}
 
 
 @router.post("/bulk/pdf-zip", dependencies=[Depends(require_editor)])
