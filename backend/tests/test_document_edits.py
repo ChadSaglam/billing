@@ -1,6 +1,9 @@
-"""Edit paths that used to corrupt or crash a document (R-66, R-69, R-70)."""
+"""Edit paths that used to corrupt or crash a document (R-66, R-69, R-70, R-72)."""
+import io
 import uuid
 from decimal import Decimal
+
+from pypdf import PdfReader
 
 
 def _client(client, headers, **overrides):
@@ -113,3 +116,51 @@ def test_duplicate_with_null_payment_terms_does_not_crash(client, make_tenant):
     assert clone["id"] != doc["id"]
     assert clone["status"] == "draft"
     assert Decimal(clone["total"]) == Decimal(doc["total"])
+
+
+# ── R-72 ──────────────────────────────────────────────────────
+
+def _pdf_text(content: bytes) -> str:
+    return "\n".join(page.extract_text() for page in PdfReader(io.BytesIO(content)).pages)
+
+
+def test_pdf_renders_markup_characters_in_names_literally(client, make_tenant):
+    """reportlab Paragraph reads its text as XML: an unbalanced `<b>` raises and
+    an unknown `<tag>` silently disappears from the printout."""
+    t = make_tenant()
+    company = "Müller & Söhne <Holding> AG"
+    resp = client.put(
+        "/api/settings",
+        json={"company_name": company, "iban": "CH93 0076 2011 6238 5295 7"},
+        headers=t["headers"],
+    )
+    assert resp.status_code == 200, resp.text
+
+    cid = _client(client, t["headers"], company_name="Bold <b> Bauer GmbH", contact_person="R&D <i>Team")
+    doc = _invoice(client, t["headers"], cid, notes="Zahlbar <b>sofort")
+
+    resp = client.get(f"/api/documents/{doc['id']}/pdf", headers=t["headers"])
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("application/pdf")
+    text = _pdf_text(resp.content)
+    assert "Müller & Söhne <Holding> AG" in text
+    assert "Bold <b> Bauer GmbH" in text
+    assert "R&D <i>Team" in text
+    assert "Zahlbar <b>sofort" in text
+
+
+def test_classic_template_escapes_names_too(client, make_tenant):
+    t = make_tenant()
+    resp = client.put(
+        "/api/settings",
+        json={"company_name": "A <b> B", "pdf_template": "classic", "iban": "CH93 0076 2011 6238 5295 7"},
+        headers=t["headers"],
+    )
+    assert resp.status_code == 200, resp.text
+    cid = _client(client, t["headers"], company_name="C <i> D")
+    doc = _invoice(client, t["headers"], cid)
+    resp = client.get(f"/api/documents/{doc['id']}/pdf", headers=t["headers"])
+    assert resp.status_code == 200, resp.text
+    text = _pdf_text(resp.content)
+    assert "A <b> B" in text
+    assert "C <i> D" in text

@@ -1,5 +1,6 @@
 import io
 from decimal import Decimal
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
@@ -17,6 +18,27 @@ ACCENT_COLOR = colors.HexColor("#0f3460")
 LIGHT_BG = colors.HexColor("#f8f9fa")
 BORDER_COLOR = colors.HexColor("#dee2e6")
 MUTED = colors.HexColor("#6c757d")
+
+
+def _esc(value) -> str:
+    """Escape text for reportlab Paragraph markup — it parses `<`, `>` and `&` as XML (R-72)."""
+    return escape("" if value is None else str(value))
+
+
+class _Escaped:
+    """Attribute proxy: string attributes come back escaped for Paragraph markup.
+
+    Wrap the ORM objects once per template instead of remembering `_esc()`
+    at every f-string. Anything that needs the raw value (QR payload, image
+    paths) reads the original object.
+    """
+
+    def __init__(self, obj):
+        self._obj = obj
+
+    def __getattr__(self, name):
+        value = getattr(self._obj, name)
+        return escape(value) if isinstance(value, str) else value
 
 
 def _fmt(val: Decimal) -> str:
@@ -106,7 +128,9 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
 
     elements = []
     type_label = "Rechnung" if document.document_type == "rechnung" else "Offerte"
-    client = document.client
+    raw_settings = settings
+    settings = _Escaped(settings)
+    client = _Escaped(document.client)
 
     # Header — company name left-aligned, simple
     elements.append(Paragraph(f"<b>{settings.company_name}</b>", ParagraphStyle("H", fontName="Helvetica-Bold", fontSize=16, leading=20)))
@@ -151,7 +175,7 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
     elements.append(Spacer(1, 15 * mm))
 
     # Title
-    elements.append(Paragraph(f"{type_label} Nr. {document.document_number}", styles["DocTitle"]))
+    elements.append(Paragraph(f"{type_label} Nr. {_esc(document.document_number)}", styles["DocTitle"]))
     elements.append(Spacer(1, 2 * mm))
 
     greeting = (
@@ -177,7 +201,7 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
         table_data.append([
             Paragraph(str(item.position), styles["Cell"]),
             Paragraph(item.description, styles["Cell"]),
-            Paragraph(f"{_fmt(item.quantity)} {item.unit}", styles["CellR"]),
+            Paragraph(f"{_fmt(item.quantity)} {_esc(item.unit)}", styles["CellR"]),
             Paragraph(f"{_fmt(item.unit_price)} CHF", styles["CellR"]),
             Paragraph(f"{_fmt(item.total_price)} CHF", styles["CellR"]),
         ])
@@ -225,7 +249,7 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
         elements.append(Spacer(1, 4 * mm))
 
     if document.notes:
-        elements.append(Paragraph(f"<b>Hinweis:</b> {document.notes}", styles["Normal"]))
+        elements.append(Paragraph(f"<b>Hinweis:</b> {_esc(document.notes)}", styles["Normal"]))
         elements.append(Spacer(1, 4 * mm))
 
     elements.append(Paragraph("Mit freundlichen Grüssen", styles["Normal"]))
@@ -244,7 +268,7 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
 
     if document.document_type == "rechnung":
         elements.append(PageBreak())
-        _add_qr_bill_page(elements, document, settings, _build_styles())
+        _add_qr_bill_page(elements, document, raw_settings, _build_styles())
 
     doc.build(elements)
     return buffer
@@ -254,7 +278,9 @@ def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.By
     styles = _build_styles()
     elements = []
     type_label = "Rechnung" if document.document_type == "rechnung" else "Offerte"
-    client = document.client
+    raw_settings = settings
+    settings = _Escaped(settings)
+    client = _Escaped(document.client)
 
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -325,7 +351,7 @@ def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.By
     elements.append(Spacer(1, 15 * mm))
 
     # ── TITLE ──
-    elements.append(Paragraph(f"{type_label} Nr. {document.document_number}", styles["DocTitle"]))
+    elements.append(Paragraph(f"{type_label} Nr. {_esc(document.document_number)}", styles["DocTitle"]))
     elements.append(Spacer(1, 2 * mm))
 
     greeting = (
@@ -350,7 +376,7 @@ def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.By
         table_data.append([
             Paragraph(str(item.position), styles["TableCell"]),
             Paragraph(item.description, styles["TableCell"]),
-            Paragraph(f"{_fmt(item.quantity)} {item.unit}", styles["TableCellRight"]),
+            Paragraph(f"{_fmt(item.quantity)} {_esc(item.unit)}", styles["TableCellRight"]),
             Paragraph(f"{_fmt(item.unit_price)} CHF", styles["TableCellRight"]),
             Paragraph(f"{_fmt(item.total_price)} CHF", styles["TableCellRight"]),
         ])
@@ -417,7 +443,7 @@ def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.By
         elements.append(Spacer(1, 4 * mm))
 
     if document.notes:
-        elements.append(Paragraph(f"<b>Hinweis:</b> {document.notes}", styles["Body"]))
+        elements.append(Paragraph(f"<b>Hinweis:</b> {_esc(document.notes)}", styles["Body"]))
         elements.append(Spacer(1, 4 * mm))
 
     # ── CLOSING ──
@@ -440,7 +466,7 @@ def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.By
     # ── PAGE 2: QR BILL ──
     if document.document_type == "rechnung":
         elements.append(PageBreak())
-        _add_qr_bill_page(elements, document, settings, styles)
+        _add_qr_bill_page(elements, document, raw_settings, styles)
 
     doc.build(elements)
     return buffer
@@ -580,13 +606,13 @@ def _add_qr_bill_page(elements, document, settings, styles):
         [Paragraph("Empfangsschein", title_s)],
         [Spacer(1, 2 * mm)],
         [Paragraph("Konto / Zahlbar an", label_s)],
-        [Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", value_s)],
+        [Paragraph(f"{iban_clean}<br/>{_esc(creditor_name)}<br/>{_esc(creditor_address)}<br/>{_esc(creditor_zip)} {_esc(creditor_city)}", value_s)],
         [Spacer(1, 1.5 * mm)],
         [Paragraph("Referenz", label_s)],
         [Paragraph(creditor_ref_display, value_s)],
         [Spacer(1, 1.5 * mm)],
         [Paragraph("Zahlbar durch", label_s)],
-        [Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", value_s)],
+        [Paragraph(f"{_esc(debtor_name)}<br/>{_esc(debtor_address)}<br/>{_esc(debtor_zip)} {_esc(debtor_city)}", value_s)],
         [Spacer(1, 2 * mm)],
         [Paragraph("Währung          Betrag", label_s)],
         [Paragraph(f"{currency}                    {_fmt(document.total)}", value_s)],
@@ -621,16 +647,16 @@ def _add_qr_bill_page(elements, document, settings, styles):
     pay_right_items = [
         [Spacer(1, 16 * mm)],
         [Paragraph("Konto / Zahlbar an", label_big)],
-        [Paragraph(f"{iban_clean}<br/>{creditor_name}<br/>{creditor_address}<br/>{creditor_zip} {creditor_city}", value_big)],
+        [Paragraph(f"{iban_clean}<br/>{_esc(creditor_name)}<br/>{_esc(creditor_address)}<br/>{_esc(creditor_zip)} {_esc(creditor_city)}", value_big)],
         [Spacer(1, 1.5 * mm)],
         [Paragraph("Referenz", label_big)],
         [Paragraph(creditor_ref_display, value_big)],
         [Spacer(1, 1.5 * mm)],
         [Paragraph("Zahlbar durch", label_big)],
-        [Paragraph(f"{debtor_name}<br/>{debtor_address}<br/>{debtor_zip} {debtor_city}", value_big)],
+        [Paragraph(f"{_esc(debtor_name)}<br/>{_esc(debtor_address)}<br/>{_esc(debtor_zip)} {_esc(debtor_city)}", value_big)],
         [Spacer(1, 1.5 * mm)],
         [Paragraph("Zusätzliche Informationen", label_big)],
-        [Paragraph(ref_info, value_big)],
+        [Paragraph(_esc(ref_info), value_big)],
     ]
     pay_right = Table(pay_right_items, colWidths=[46 * mm])
     pay_right.setStyle(TableStyle([
