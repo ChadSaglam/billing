@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { ServiceManager } from '@/components/ServiceManager';
 import { LineItemRow } from './LineItemRow';
-import { emptyLineItem } from './line-item-utils';
+import { calculateTotals, emptyLineItem, lineTotal } from './line-item-utils';
 import type { LineItemFormData } from './line-item-utils';
 
 interface LineItemsEditorProps {
@@ -40,31 +40,16 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
     }, {});
   }, [services]);
 
-  const subtotal = items.reduce((sum, item) => sum + item.total_price, 0);
-  const discountAmount = (subtotal * discountPercent) / 100;
-  const afterDiscount = subtotal - discountAmount;
-
-  // Calculate VAT grouped by rate
-  const vatByRate = useMemo(() => {
-    const map = new Map<number, number>();
-    const ratio = subtotal > 0 ? afterDiscount / subtotal : 0;
-    for (const item of items) {
-      const vatAmount = item.total_price * ratio * item.vat_rate / 100;
-      map.set(item.vat_rate, (map.get(item.vat_rate) || 0) + vatAmount);
-    }
-    return Array.from(map.entries())
-      .filter(([, amt]) => amt > 0)
-      .sort(([a], [b]) => b - a);
-  }, [items, afterDiscount, subtotal]);
-
-  const totalVat = vatByRate.reduce((sum, [, amt]) => sum + amt, 0);
-  const total = afterDiscount + totalVat;
+  const { subtotal, discountAmount, vatByRate, total } = useMemo(
+    () => calculateTotals(items, discountPercent),
+    [items, discountPercent],
+  );
 
   const handleItemChange = (index: number, field: keyof LineItemFormData, value: string | number) => {
     const updated = [...items];
     const item = { ...updated[index], [field]: value };
     if (field === 'quantity' || field === 'unit_price') {
-      item.total_price = Number(item.quantity) * Number(item.unit_price);
+      item.total_price = lineTotal(item.quantity, item.unit_price);
     }
     updated[index] = item;
     onChange(updated);
