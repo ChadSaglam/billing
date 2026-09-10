@@ -62,3 +62,29 @@ def test_429_uses_envelope_and_retry_after(client, rate_limiter_enabled):
     retry_after = int(resp.headers["Retry-After"])
     assert 1 <= retry_after <= 60
     assert body["error"]["retry_after"] == retry_after
+
+
+def test_500_uses_envelope_and_hides_the_exception(client):
+    """Unhandled exceptions must come back as the envelope too, without
+    leaking the exception text (R-95). The failing route only exists here."""
+    # test_docs_visibility reloads `app.main`, so resolve the app the client
+    # actually serves rather than importing it afresh.
+    app = client.app
+
+    path = "/api/_test/boom"
+    if not any(getattr(r, "path", None) == path for r in app.routes):
+
+        def boom():
+            raise RuntimeError("secret internals")
+
+        app.add_api_route(path, boom, methods=["GET"])
+
+    resp = client.get(path, headers={"X-Request-ID": "rid-500"})
+    assert resp.status_code == 500
+    body = resp.json()
+    assert body["detail"] == "Internal server error"
+    assert body["error"]["code"] == "internal_error"
+    assert body["error"]["message"] == "Internal server error"
+    assert body["error"]["request_id"] == "rid-500"
+    assert resp.headers["X-Request-ID"] == "rid-500"
+    assert "secret internals" not in resp.text
