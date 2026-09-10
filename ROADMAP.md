@@ -46,10 +46,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 - [ ] **R-96** Drop the legacy top-level `detail` from error responses in **2.6.0** (contract:
       chadev-platform/contracts/errors.md). No first-party reader left after R-94; flag in release notes. — `M` / `S`
       `backend/app/core/errors.py` · `backend/app/limiter.py`
-- [ ] **R-92b** Rate-limit keys per tenant (`tid` from token) in addition to IP for authenticated routes. — `M` / `S`
-      `backend/app/limiter.py`
-- [ ] **R-48** Shared helpers across routers: paginated-response wrapper, uniform error shape,
-      tenant-scoped query helper. Prereq for R-46 and R-86. — `M` / `S`
 - [ ] **R-46** Split `documents.py` (661 lines — 4× the next-largest router). Slices, tests green
       after each: 1) helpers (`_build_line_item`, `_recalc_totals`, `_get_doc`, `_load_full`,
       `_get_settings`, `_calc_next_recurrence`) → `services/document_service.py` · 2) routes → CRUD /
@@ -84,11 +80,9 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 - [ ] **R-15b** httpOnly SameSite cookies for the refresh token. Decision record first
       (CSRF surface vs. XSS blast radius), then implement. — `H` / `M`
       `SECURITY.md` · `frontend/src/lib/api.ts` · `frontend/src/lib/auth.ts`
-- [ ] **R-83** Tenant isolation is 100 % manual: `filter(Model.tenant_id == tenant_id)` repeated in every
-      query (56 occurrences in `documents.py` alone). One forgotten filter = cross-tenant leak.
-      Step 1: scoped-query helper from R-48 + a test that greps every router query for a tenant filter.
-      Step 2 (decision): Postgres RLS with `SET LOCAL app.tenant_id` as defence in depth. — `H` / `L`
-      `backend/app/api/*.py`
+- [ ] **R-83b** Decision: Postgres RLS with `SET LOCAL app.tenant_id` as defence in depth behind the
+      `scoped()` helper (R-83 step 2; platform 2.5). Decision record first, then migration. — `H` / `L`
+      `backend/app/database.py` · `backend/alembic/`
 - [ ] **R-53** Portal attack-surface review — the only public unauthenticated surface: token entropy
       (48 B urlsafe — OK), **no expiry**, enumeration resistance, per-IP throttling. — `H` / `M`
       `backend/app/api/portal.py`
@@ -175,7 +169,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## 🅿️ Parked (off-topic, pulled back when the current task is closed)
 
-- **P-01** Stripe subscription billing for the SaaS itself — after security gate (R-15b, R-83, R-53).
+- **P-01** Stripe subscription billing for the SaaS itself — after security gate (R-15b, R-83b, R-53).
 - **P-02** Public REST API + API keys — after R-48 helpers exist.
 - **P-03** WebSocket live updates — only if R-60 polling feels stale.
 - **P-04** Payment links on invoices (TWINT / card) — after QR-bill proven in production.
@@ -186,6 +180,9 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-83** ✅ 2026-09-10 — Step 1: `tests/test_tenant_scoping_guard.py` parses every `db.query()` in `app/api/*.py` on a model with a `tenant_id` column and fails unless it goes through `scoped()`/`get_or_404()` or filters `tenant_id ==` itself (allowlist with reasons: email/jti/portal-token lookups). Step 2 (RLS) continues as R-83b. Tests 56 → **58**.
+- **R-48** ✅ 2026-09-10 — `services/tenancy.py`: `scoped(db, Model, tenant_id)` + `get_or_404()`; clients, services, settings, users, dashboard, documents migrated with identical SQL. Error shape is already uniform via the R-27 envelope; a paginated-response wrapper is not needed while both paginated lists share the R-13 shape.
+- **R-92b** ✅ 2026-09-10 — `tenant_or_ip_key()`: `tenant:<tid>` from a valid access token, else `ip:<addr>`. Document create/pdf/preview/send-email, bulk ×3 and logo upload at `120/minute` per tenant; auth routes stay per IP. Limiter keyed by endpoint, not URL, so `/{id}/pdf` shares one bucket. Tests 51 → **56**.
 - **R-95** ✅ 2026-09-10 — Test that the 500 envelope carries `error.code=internal_error` + `detail` and hides the exception text. Tests 50 → **51**.
 - **R-94** ✅ 2026-09-10 — Frontend reads `error.message` via `lib/errors.ts` (`getApiErrorMessage`/`getRequestId`); every direct `detail` read replaced, global toast appends `(Ref: <request_id>)` on 5xx. Unblocks dropping `detail`.
 - **R-92** ✅ 2026-09-10 — slowapi 429 in the envelope: `error.code=rate_limited` + `retry_after`, `Retry-After` header, legacy `detail`. Per-tenant keys still open. Tests 49 → **50**.
@@ -221,8 +218,8 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 |---|---|---|
 | 0 | Recon / system map | ✅ done (re-verified 2026-09-04) |
 | 0.5 | Risk fixes before platform work | ✅ R-89, R-27, R-91, R-90 (branch `feat/phase0-risks`, 2026-09-09) |
-| 1 | Architecture & code quality | audit done (R-45) → NOW: R-66 · NEXT: R-48 → R-46 → R-47 → R-85 → R-86 |
-| 2 | Security & data protection | core done; open: R-15b, R-83, R-53, R-65, R-75, R-76, R-55, R-56 |
+| 1 | Architecture & code quality | audit done (R-45), R-48 helpers ✅ → NOW: R-66 · NEXT: R-46 → R-47 → R-85 → R-86 |
+| 2 | Security & data protection | core done, R-83 step 1 + R-92b ✅; open: R-15b, R-83b, R-53, R-65, R-75, R-76, R-55, R-56 |
 | 3 | Performance | not started: R-26, R-58, R-82, R-84, R-59 |
 | 4 | UX / a11y / frontend | not started: R-24, R-60, R-62, R-61, R-88, R-25, R-23, R-29 |
 | 5 | Testing & reliability | scaffold done; open: R-21, R-22, R-49, R-51, R-52, R-57 |
