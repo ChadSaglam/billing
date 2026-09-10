@@ -41,3 +41,24 @@ def test_422_keeps_detail_list_and_adds_error(client):
     assert body["error"]["code"] == "validation_error"
     assert body["error"]["request_id"] == resp.headers["X-Request-ID"]
     assert any(f["field"] == "password" for f in body["error"]["fields"])
+
+
+def test_429_uses_envelope_and_retry_after(client, rate_limiter_enabled):
+    """slowapi's stock handler answered `{"error": "<str>"}` — the only
+    response outside the envelope (R-92). Login allows 10/minute."""
+    payload = {"email": "nobody@example.com", "password": "wrong-password"}
+    resp = None
+    for _ in range(11):
+        resp = client.post("/api/auth/login", json=payload, headers={"X-Request-ID": "rid-429"})
+        if resp.status_code == 429:
+            break
+    assert resp is not None and resp.status_code == 429, resp.text
+    body = resp.json()
+    assert body["detail"] == "Too many requests, try again later"
+    assert body["error"]["code"] == "rate_limited"
+    assert body["error"]["message"] == body["detail"]
+    assert body["error"]["request_id"] == "rid-429"
+    assert resp.headers["X-Request-ID"] == "rid-429"
+    retry_after = int(resp.headers["Retry-After"])
+    assert 1 <= retry_after <= 60
+    assert body["error"]["retry_after"] == retry_after

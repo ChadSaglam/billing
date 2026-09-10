@@ -5,7 +5,6 @@ from pathlib import Path
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -17,7 +16,7 @@ from app.core.errors import RequestContextMiddleware, install_error_handlers
 from app.core.logging_config import configure_logging
 from app.core.sentry import configure_sentry
 from app.database import SessionLocal, get_db
-from app.limiter import limiter
+from app.limiter import limiter, rate_limit_exceeded_handler
 from app.models.user import User
 
 configure_logging(app_settings.LOG_LEVEL)
@@ -114,7 +113,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 install_error_handlers(app)
 app.add_middleware(RequestContextMiddleware)
 
