@@ -13,10 +13,10 @@ from app.config import Settings
     ("raw", "expected"),
     [
         # The form any shell-exported .env produces.
-        ("http://localhost:5000", ["http://localhost:5000"]),
+        ("http://localhost:5050", ["http://localhost:5050"]),
         ("http://a.example, http://b.example", ["http://a.example", "http://b.example"]),
         # The JSON form, still accepted so existing .env files keep working.
-        ('["http://localhost:5000"]', ["http://localhost:5000"]),
+        ('["http://localhost:5050"]', ["http://localhost:5050"]),
         ('["http://a.example", "http://b.example"]', ["http://a.example", "http://b.example"]),
         ("", []),
     ],
@@ -29,7 +29,7 @@ def test_allowed_origins_accepts_both_forms(monkeypatch, raw, expected):
 
 def test_settings_import_does_not_require_json(monkeypatch):
     """The original crash: JSONDecodeError at import, before the app started."""
-    monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5000")
+    monkeypatch.setenv("ALLOWED_ORIGINS", "http://localhost:5050")
     settings = Settings(_env_file=None)
-    assert settings.ALLOWED_ORIGINS == "http://localhost:5000"
-    assert settings.allowed_origins == ["http://localhost:5000"]
+    assert settings.ALLOWED_ORIGINS == "http://localhost:5050"
+    assert settings.allowed_origins == ["http://localhost:5050"]

@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: Number(process.env.FRONTEND_PORT) || 5000,
+    port: Number(process.env.FRONTEND_PORT) || 5050,
     // Inside compose the backend always listens on 8000; the published
     // port only matters to the browser. The app calls VITE_API_URL
     // directly, so this proxy is a convenience for same-origin requests.

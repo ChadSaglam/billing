@@ -36,7 +36,7 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/billing_test
       TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/billing_test
       SECRET_KEY: ci-only-secret-not-used-in-production
-      ALLOWED_ORIGINS: http://localhost:5000
+      ALLOWED_ORIGINS: http://localhost:5050
     defaults:
       run:
         working-directory: backend
@@ -146,9 +146,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/billing_e2e
       SECRET_KEY: ci-only-secret-not-used-in-production
-      # e2e stack: 5100 frontend / 9100 API (dev stack is 5000 / 9000).
-      ALLOWED_ORIGINS: http://localhost:5100
-      FRONTEND_URL: http://localhost:5100
+      # e2e stack: 5150 frontend / 9100 API (dev stack is 5050 / 9000).
+      ALLOWED_ORIGINS: http://localhost:5150
+      FRONTEND_URL: http://localhost:5150
       APP_ENV: test
       E2E_API_URL: http://localhost:9100
     steps:
@@ -243,10 +243,10 @@ jobs:
           POSTGRES_DB=billing
           DB_PORT=9432
           BACKEND_PORT=9000
-          FRONTEND_PORT=5000
+          FRONTEND_PORT=5050
           SECRET_KEY=ci-only-secret-not-used-in-production
-          ALLOWED_ORIGINS=http://localhost:5000
-          FRONTEND_URL=http://localhost:5000
+          ALLOWED_ORIGINS=http://localhost:5050
+          FRONTEND_URL=http://localhost:5050
           VITE_API_URL=http://localhost:9000
           ENVEOF
 
@@ -284,7 +284,7 @@ jobs:
           PY
 
       - name: Frontend is serving
-        run: curl -fsS http://localhost:5000 | head -c 200
+        run: curl -fsS http://localhost:5050 | head -c 200
 
       - name: Dump logs on failure
         if: failure()

@@ -30,9 +30,9 @@ if [[ -f ".env" ]]; then
   source .env
 fi
 
-# Ports come from .env; defaults match .env.example (5000 / 9000 / 9432).
+# Ports come from .env; defaults match .env.example (5050 / 9000 / 9432).
 BACKEND_PORT="${BACKEND_PORT:-9000}"
-FRONTEND_PORT="${FRONTEND_PORT:-5000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5050}"
 DB_PORT="${DB_PORT:-9432}"
 BACKEND_URL="http://localhost:${BACKEND_PORT}"
 FRONTEND_URL="http://localhost:${FRONTEND_PORT}"

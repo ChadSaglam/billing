@@ -35,7 +35,7 @@ environment variable with the default shown; `.env` overrides all of them.
 
 | Service      | Dev (`scripts/dev.sh`) | Docker (host port)          | E2E (Playwright)              |
 |--------------|------------------------|-----------------------------|-------------------------------|
-| Frontend     | `FRONTEND_PORT` 5000   | `FRONTEND_PORT` 5000 → 5173 | `E2E_FRONTEND_PORT` 5100      |
+| Frontend     | `FRONTEND_PORT` 5050   | `FRONTEND_PORT` 5050 → 5173 | `E2E_FRONTEND_PORT` 5150      |
 | Backend API  | `BACKEND_PORT` 9000    | `BACKEND_PORT` 9000 → 8000  | `E2E_API_URL` localhost:9100  |
 | PostgreSQL   | `DB_PORT` 9432         | `DB_PORT` 9432 → 5432       | whatever `DATABASE_URL` says  |
 
@@ -60,7 +60,7 @@ Open your browser:
 
 | Service       | URL                        |
 |---------------|----------------------------|
-| Frontend      | http://localhost:5000      |
+| Frontend      | http://localhost:5050      |
 | Backend API   | http://localhost:9000      |
 | API Docs      | http://localhost:9000/docs |
 
@@ -88,7 +88,7 @@ Open:
 
 | Service     | URL |
 |-------------|-----|
-| Frontend    | http://localhost:5000 |
+| Frontend    | http://localhost:5050 |
 | Backend API | http://localhost:9000 |
 | API Docs    | http://localhost:9000/docs |
 
@@ -150,13 +150,13 @@ curl -X POST http://localhost:9000/api/seed \
 
 ### End-to-end tests
 
-The Playwright run starts its own vite dev server on 5100 and expects an API
-on 9100, so it never collides with a dev stack on 5000 / 9000:
+The Playwright run starts its own vite dev server on 5150 and expects an API
+on 9100, so it never collides with a dev stack on 5050 / 9000:
 
 ```bash
 cd backend
-DATABASE_URL=postgresql://.../billing_e2e ALLOWED_ORIGINS=http://localhost:5100 \
-  FRONTEND_URL=http://localhost:5100 APP_ENV=test \
+DATABASE_URL=postgresql://.../billing_e2e ALLOWED_ORIGINS=http://localhost:5150 \
+  FRONTEND_URL=http://localhost:5150 APP_ENV=test \
   python -m uvicorn app.main:app --port 9100 &
 cd ../frontend && npx playwright test
 ```
