@@ -306,6 +306,29 @@ itself. That directory is not shared between containers, so **run with more
 than one app replica only with `STORAGE_BACKEND=s3`** (any S3-compatible
 bucket; `boto3` is imported only when selected).
 
+## Background jobs
+
+Overdue marking and recurring invoices run as scheduled jobs
+(`backend/app/services/jobs.py`), one pass every `JOBS_INTERVAL_SECONDS`
+(default 3600). A Postgres advisory lock guarantees exactly one process
+executes a pass, whatever the topology.
+
+| Setting | Default | Notes |
+|---|---|---|
+| `RUN_JOBS_IN_API` | `true` | API runs the jobs in-process — local dev (`scripts/dev.sh`) and single-container setups |
+| `JOBS_INTERVAL_SECONDS` | `3600` | seconds between passes |
+
+`docker-compose.yml` sets `RUN_JOBS_IN_API=false` on `backend` and runs the
+jobs in the dedicated `jobs` service (`python -m app.jobs`, same image), so
+job uptime is not tied to API restarts and a slow pass never blocks requests
+(R-84). To run a single pass by hand (cron, smoke test):
+
+```bash
+cd backend && python -m app.jobs --once
+# or in Docker
+docker compose run --rm jobs python -m app.jobs --once
+```
+
 ## Deployment
 
 See `billing-deployment-guide.md` for full instructions on deploying to a Hostinger VPS with Docker, Nginx, SSL, and the `chadev.space` domain.

@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     S3_REGION: str = ""
     S3_PUBLIC_BASE_URL: str = ""
 
+    # Scheduled jobs (R-84). True = the API runs them in-process (single
+    # container, local dev). Compose sets it false on the API and starts a
+    # separate `python -m app.jobs` service instead.
+    RUN_JOBS_IN_API: bool = True
+    JOBS_INTERVAL_SECONDS: int = 3600
+
     @cached_property
     def allowed_origins(self) -> list[str]:
         """CORS origins as a list. Use this, not the raw ALLOWED_ORIGINS."""

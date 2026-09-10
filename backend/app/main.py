@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,6 +19,7 @@ from app.core.sentry import configure_sentry
 from app.database import SessionLocal, get_db
 from app.limiter import limiter, rate_limit_exceeded_handler
 from app.models.user import User
+from app.services.jobs import background_jobs_loop, run_scheduled_jobs
 
 configure_logging(app_settings.LOG_LEVEL)
 configure_sentry(app_settings.SENTRY_DSN, app_settings.APP_ENV)
@@ -27,75 +29,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = BASE_DIR / "uploads"
 LOGOS_DIR = UPLOADS_DIR / "logos"
 
-# Postgres advisory lock id for the scheduled jobs. Any constant works — it
-# just has to be the same in every worker so they contend on one lock.
-JOBS_LOCK_ID = 727272
-
-
-def _run_scheduled_jobs(db: Session, source: str) -> None:
-    """Run the hourly jobs, but on exactly one worker per pass.
-
-    These used to run in-process in every uvicorn worker, so N workers meant
-    N copies of the same recurring invoice (R-14). `pg_try_advisory_lock`
-    elects a single runner database-wide; everyone else skips this pass.
-    On non-Postgres databases (none today) it simply runs unlocked.
-    """
-    from app.services.overdue_checker import mark_overdue_invoices
-    from app.services.recurring_invoices import process_recurring_invoices
-
-    locked = False
-    if db.bind.dialect.name == "postgresql":
-        locked = db.execute(
-            text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": JOBS_LOCK_ID}
-        ).scalar()
-        if not locked:
-            return  # another worker owns this pass
-    try:
-        count = mark_overdue_invoices(db)
-        if count:
-            logger.info("[%s] Marked %d invoices as overdue", source, count)
-
-        created = process_recurring_invoices(db)
-        if created:
-            logger.info("[%s] Created %d recurring invoices", source, created)
-    finally:
-        if locked:
-            db.execute(
-                text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": JOBS_LOCK_ID}
-            )
-
-
-async def _background_jobs():
-    import asyncio
-
-    while True:
-        try:
-            db = SessionLocal()
-            try:
-                _run_scheduled_jobs(db, "background")
-            finally:
-                db.close()
-        except Exception:
-            logger.exception("[background] scheduled jobs failed")
-
-        await asyncio.sleep(3600)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    import asyncio
-
     # Schema is owned by Alembic only — `alembic upgrade head`.
     # create_all() here silently diverged from the migrations (R-10).
-    db = SessionLocal()
-    try:
-        _run_scheduled_jobs(db, "startup")
-    finally:
-        db.close()
-
-    task = asyncio.create_task(_background_jobs())
+    #
+    # Scheduled jobs run here only when RUN_JOBS_IN_API is true (the default,
+    # for single-container and local dev). In compose the API sets it false
+    # and the `jobs` service (`python -m app.jobs`) is the one runner (R-84).
+    task = None
+    if app_settings.RUN_JOBS_IN_API:
+        db = SessionLocal()
+        try:
+            run_scheduled_jobs(db, "startup")
+        finally:
+            db.close()
+        task = asyncio.create_task(background_jobs_loop())
+    else:
+        logger.info("RUN_JOBS_IN_API=false — scheduled jobs left to the jobs worker")
     yield
-    task.cancel()
+    if task is not None:
+        task.cancel()
 
 
 _is_production = app_settings.APP_ENV == "production"

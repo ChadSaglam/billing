@@ -33,6 +33,8 @@ services:
       # port it is published on outside.
       DATABASE_URL: postgresql://${POSTGRES_USER:-chadev}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-billing}
       APP_ENV: ${APP_ENV:-development}
+      # The `jobs` service below is the single job runner in Docker (R-84).
+      RUN_JOBS_IN_API: "false"
     volumes:
       - ./backend:/app
       - uploads:/app/uploads
@@ -42,6 +44,28 @@ services:
       timeout: 10s
       retries: 20
       start_period: 60s
+
+  # Scheduled jobs (overdue marking, recurring invoices) in their own
+  # process, so job uptime is not API uptime and a slow pass never blocks a
+  # request (R-84). Same image; migrations are applied by the backend
+  # entrypoint, so this one waits for a healthy backend as well as the db.
+  jobs:
+    build: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.jobs"]
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chadev}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-billing}
+      APP_ENV: ${APP_ENV:-development}
+      JOBS_INTERVAL_SECONDS: ${JOBS_INTERVAL_SECONDS:-3600}
+    volumes:
+      - ./backend:/app
 
   frontend:
     build:
