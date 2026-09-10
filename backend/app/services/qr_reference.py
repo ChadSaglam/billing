@@ -27,6 +27,9 @@ def generate_creditor_reference(document_number: str) -> str:
     raw = re.sub(r"[^A-Z0-9]", "", document_number.upper())
     if not raw:
         raw = "0"
+    # ISO 11649 allows 21 characters after "RFxx". Keep the tail: for
+    # counter-based numbers that is the part that changes.
+    raw = raw[-CREDITOR_REFERENCE_MAX_BODY:]
 
     check = 98 - (int(_iso7064_numeric(raw + "RF00")) % 97)
     return f"RF{check:02d}{raw}"

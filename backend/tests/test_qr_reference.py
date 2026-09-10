@@ -59,6 +59,19 @@ def test_iso11649_empty_input_falls_back_to_zero():
     assert validate_creditor_reference(ref)
 
 
+def test_iso11649_reference_never_exceeds_25_characters():
+    """ISO 11649: 25 characters max, i.e. at most 21 after `RFxx`.
+
+    A document number longer than that must not produce an invalid reference
+    that banks reject at payment time.
+    """
+    ref = generate_creditor_reference("1234567890123456789012345")  # 25 digits
+    assert len(ref) <= 25
+    assert validate_creditor_reference(ref)
+    # The distinguishing tail of a counter-based number survives.
+    assert ref.endswith("2345")
+
+
 def test_validate_creditor_reference_rejects_bad_check_digits():
     assert not validate_creditor_reference("RF19539007547034")
     assert not validate_creditor_reference("RF18 5390 0754 7034".replace(" ", "") + "X" * 10)
