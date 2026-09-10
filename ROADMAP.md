@@ -2,7 +2,7 @@
 
 > One running list. Never duplicated — items move between sections, they don't get re-added.
 > Legend: severity `C`ritical / `H`igh / `M`edium / `L`ow · effort `S` (<1h) / `M` (half day) / `L` (multi-day)
-> IDs: `R-xx` = work item (next free: **R-96**) · `P-xx` = parked idea (next free: **P-07**)
+> IDs: `R-xx` = work item (next free: **R-98**) · `P-xx` = parked idea (next free: **P-07**)
 > Cross-product items (SSO, contracts, design tokens) live in `chadev-platform/ROADMAP.md`, not here.
 > Updated: 2026-09-10
 
@@ -43,6 +43,11 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ⏭ NEXT — "easier to improve" foundation (order matters: helpers → splits → types)
 
+- [ ] **R-96** Drop the legacy top-level `detail` from error responses in **2.6.0** (contract:
+      chadev-platform/contracts/errors.md). No first-party reader left after R-94; flag in release notes. — `M` / `S`
+      `backend/app/core/errors.py` · `backend/app/limiter.py`
+- [ ] **R-92b** Rate-limit keys per tenant (`tid` from token) in addition to IP for authenticated routes. — `M` / `S`
+      `backend/app/limiter.py`
 - [ ] **R-48** Shared helpers across routers: paginated-response wrapper, uniform error shape,
       tenant-scoped query helper. Prereq for R-46 and R-86. — `M` / `S`
 - [ ] **R-46** Split `documents.py` (661 lines — 4× the next-largest router). Slices, tests green
