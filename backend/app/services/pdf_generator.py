@@ -41,6 +41,11 @@ class _Escaped:
         return escape(value) if isinstance(value, str) else value
 
 
+def _currency(document) -> str:
+    """ISO code printed next to every amount and in the QR payload (R-68)."""
+    return (document.currency or "CHF").upper()
+
+
 def _fmt(val: Decimal) -> str:
     return f"{val:,.2f}".replace(",", "'")
 
@@ -108,6 +113,7 @@ def _build_styles():
 
 def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.BytesIO:
     """Clean minimal template — no color accent, traditional Swiss business style."""
+    currency = _currency(document)
     buffer = io.BytesIO()
 
     doc = SimpleDocTemplate(
@@ -202,8 +208,8 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
             Paragraph(str(item.position), styles["Cell"]),
             Paragraph(item.description, styles["Cell"]),
             Paragraph(f"{_fmt(item.quantity)} {_esc(item.unit)}", styles["CellR"]),
-            Paragraph(f"{_fmt(item.unit_price)} CHF", styles["CellR"]),
-            Paragraph(f"{_fmt(item.total_price)} CHF", styles["CellR"]),
+            Paragraph(f"{_fmt(item.unit_price)} {currency}", styles["CellR"]),
+            Paragraph(f"{_fmt(item.total_price)} {currency}", styles["CellR"]),
         ])
 
     items_table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -226,10 +232,10 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
     elements.append(Spacer(1, 3 * mm))
 
     # Totals
-    totals_data = [["", "", "", Paragraph("Zwischensumme", styles["CellR"]), Paragraph(f"{_fmt(document.subtotal)} CHF", styles["CellR"])]]
+    totals_data = [["", "", "", Paragraph("Zwischensumme", styles["CellR"]), Paragraph(f"{_fmt(document.subtotal)} {currency}", styles["CellR"])]]
     if document.discount_percent and document.discount_percent > 0:
-        totals_data.append(["", "", "", Paragraph(f"Rabatt ({_fmt(document.discount_percent)}%)", styles["CellR"]), Paragraph(f"–{_fmt(document.discount_amount)} CHF", styles["CellR"])])
-    totals_data.append(["", "", "", Paragraph(f"<b>{type_label}betrag</b>", styles["CellRB"]), Paragraph(f"<b>{_fmt(document.total)} CHF</b>", styles["CellRB"])])
+        totals_data.append(["", "", "", Paragraph(f"Rabatt ({_fmt(document.discount_percent)}%)", styles["CellR"]), Paragraph(f"–{_fmt(document.discount_amount)} {currency}", styles["CellR"])])
+    totals_data.append(["", "", "", Paragraph(f"<b>{type_label}betrag</b>", styles["CellRB"]), Paragraph(f"<b>{_fmt(document.total)} {currency}</b>", styles["CellRB"])])
 
     totals_table = Table(totals_data, colWidths=col_widths)
     totals_table.setStyle(TableStyle([
@@ -274,6 +280,7 @@ def _generate_classic_pdf(document: Document, settings: CompanySettings) -> io.B
     return buffer
 
 def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.BytesIO:
+    currency = _currency(document)
     buffer = io.BytesIO()
     styles = _build_styles()
     elements = []
@@ -377,8 +384,8 @@ def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.By
             Paragraph(str(item.position), styles["TableCell"]),
             Paragraph(item.description, styles["TableCell"]),
             Paragraph(f"{_fmt(item.quantity)} {_esc(item.unit)}", styles["TableCellRight"]),
-            Paragraph(f"{_fmt(item.unit_price)} CHF", styles["TableCellRight"]),
-            Paragraph(f"{_fmt(item.total_price)} CHF", styles["TableCellRight"]),
+            Paragraph(f"{_fmt(item.unit_price)} {currency}", styles["TableCellRight"]),
+            Paragraph(f"{_fmt(item.total_price)} {currency}", styles["TableCellRight"]),
         ])
 
     items_table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -407,18 +414,18 @@ def _generate_modern_pdf(document: Document, settings: CompanySettings) -> io.By
     totals_data = [
         ["", "", "",
          Paragraph("Zwischensumme", styles["TableCellRight"]),
-         Paragraph(f"{_fmt(document.subtotal)} CHF", styles["TableCellRight"])],
+         Paragraph(f"{_fmt(document.subtotal)} {currency}", styles["TableCellRight"])],
     ]
     if document.discount_percent and document.discount_percent > 0:
         totals_data.append([
             "", "", "",
             Paragraph(f"Rabatt ({_fmt(document.discount_percent)}%)", styles["TableCellRight"]),
-            Paragraph(f"–{_fmt(document.discount_amount)} CHF", styles["TableCellRight"]),
+            Paragraph(f"–{_fmt(document.discount_amount)} {currency}", styles["TableCellRight"]),
         ])
     totals_data.append([
         "", "", "",
         Paragraph(f"<b>{type_label}betrag</b>", styles["TableCellBold"]),
-        Paragraph(f"<b>{_fmt(document.total)} CHF</b>", styles["TableCellBold"]),
+        Paragraph(f"<b>{_fmt(document.total)} {currency}</b>", styles["TableCellBold"]),
     ])
 
     totals_table = Table(totals_data, colWidths=col_widths)
@@ -495,7 +502,7 @@ def _add_qr_bill_page(elements, document, settings, styles):
     debtor_city = document.client.city[:35]
     debtor_country = (document.client.country or "CH")[:2].upper()
     amount = f"{document.total:.2f}"
-    currency = document.currency or "CHF"
+    currency = _currency(document)
     creditor_ref = generate_creditor_reference(document.document_number)
     creditor_ref_display = format_creditor_reference(creditor_ref)
     ref_info = f"{document.document_type.upper()} {document.document_number}"

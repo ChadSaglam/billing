@@ -3,6 +3,7 @@ import io
 import uuid
 from decimal import Decimal
 
+import pytest
 from pypdf import PdfReader
 
 
@@ -164,3 +165,26 @@ def test_classic_template_escapes_names_too(client, make_tenant):
     text = _pdf_text(resp.content)
     assert "A <b> B" in text
     assert "C <i> D" in text
+
+
+# ── R-68 ──────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("template", ["modern", "classic"])
+def test_pdf_prints_document_currency_not_hardcoded_chf(client, make_tenant, template):
+    """A EUR invoice must say EUR on every amount and in the QR payload."""
+    t = make_tenant()
+    resp = client.put(
+        "/api/settings",
+        json={"pdf_template": template, "iban": "CH93 0076 2011 6238 5295 7"},
+        headers=t["headers"],
+    )
+    assert resp.status_code == 200, resp.text
+    cid = _client(client, t["headers"])
+    doc = _invoice(client, t["headers"], cid, currency="EUR", discount_percent="10")
+    assert doc["currency"] == "EUR"
+
+    resp = client.get(f"/api/documents/{doc['id']}/pdf", headers=t["headers"])
+    assert resp.status_code == 200, resp.text
+    text = _pdf_text(resp.content)
+    assert "EUR" in text
+    assert "CHF" not in text
