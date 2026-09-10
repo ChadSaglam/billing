@@ -2,7 +2,7 @@
 
 > One running list. Never duplicated — items move between sections, they don't get re-added.
 > Legend: severity `C`ritical / `H`igh / `M`edium / `L`ow · effort `S` (<1h) / `M` (half day) / `L` (multi-day)
-> IDs: `R-xx` = work item (next free: **R-98**) · `P-xx` = parked idea (next free: **P-07**)
+> IDs: `R-xx` = work item (next free: **R-101**) · `P-xx` = parked idea (next free: **P-07**)
 > Cross-product items (SSO, contracts, design tokens) live in `chadev-platform/ROADMAP.md`, not here.
 > Updated: 2026-09-10
 
@@ -23,10 +23,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## 🔥 NOW — do these in order (one at a time)
 
-- [ ] **R-66** `update_document` recalculates totals **only when `line_items` is sent** — a
-      discount-only update leaves subtotal/VAT/total stale in the DB. Move recalc out of the
-      `if data.line_items is not None` branch; always recalc from stored items. — `H` / `S`
-      `backend/app/api/documents.py` (`update_document`) · test in `test_totals.py`
 - [ ] **R-35** `test.pdf` and `test_export.csv` are tracked at the repo root — test artifacts in version control. — `L` / `S`
       **Reopened 2026-09-04: still committed (26,170 B / 2,399 B). `git rm` + already gitignored.**
 - [ ] **R-67** `send_document_email_endpoint` passes ORM objects (`doc`, `company`) into a
@@ -98,15 +94,16 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ### Money logic correctness
 
-- [ ] **R-49** Rounding audit: per-line vs document-level VAT rounding; Swiss 5-Rappen cash rounding.
-      Test matrix in `test_totals.py`. — `C` / `M`
-- [ ] **R-69** `update_document`: `due_date = doc.date + timedelta(days=doc.payment_terms_days)` crashes
-      when `payment_terms_days` is None, and overwrites an explicitly-sent `due_date`. — `M` / `S`
-- [ ] **R-70** `duplicate_document`: same missing None-guard → 500. — `M` / `S`
-- [ ] **R-72** Client/company names go raw into reportlab `Paragraph` markup — "Müller & Co" breaks
-      PDF generation → 500. Central escape helper in both templates + QR slip. — `M` / `S`
-- [ ] **R-51** QR reference edge-case tests: MOD10/ISO-11649 checksum, sanitization, EUR variant. — `H` / `S`
-      `backend/app/services/qr_reference.py`
+- [ ] **R-98** Money rounding is `ROUND_HALF_EVEN` (Decimal default) in `_build_line_item` and
+      `_recalc_totals`; Swiss commercial rounding is `ROUND_HALF_UP` (0.405 → 0.41, 3.525 → 3.53).
+      Switch both quantize calls, flip the two strict xfails in `test_totals.py`, note in release
+      notes that historical totals may differ by 1 Rp. — `H` / `S`
+      `backend/app/api/documents.py`
+- [ ] **R-99** `line_items.quantity` is `Numeric(10,2)`: a 3-decimal quantity (1.235 kg) is stored
+      rounded to 1.24 while `total_price` was computed from 1.235, so the printed line no longer
+      multiplies out. Either validate to 2 decimals in the schema (422) or widen to `Numeric(10,3)`
+      with a migration. Strict xfail in `test_totals.py`. — `M` / `S`
+      `backend/app/models/line_item.py` · `backend/app/schemas/document.py`
 - [ ] **R-52** Invoice number race test: concurrent creates under one tenant. Prove `FOR UPDATE` holds. — `H` / `M`
 - [ ] **R-57** Recurring-invoice idempotency under scheduler retry / double-run. — `H` / `S`
 - [ ] **R-87** Configurable document-number format per tenant (prefix, year, zero-padding,
@@ -144,9 +141,9 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ### Testing & reliability
 
-- [ ] **R-21** Vitest not installed, no `test` script, `src/test` does not exist. Install + first
-      tests for `line-item-utils.ts` and `optimistic.ts` (rollback correctness). — `M` / `M`
-- [ ] **R-22** Playwright: add auth, portal, multi-tenant specs (1 spec today). — `M` / `L`
+- [ ] **R-100** Playwright: portal (public token link) and multi-tenant isolation specs on top of
+      the R-22 happy path. — `M` / `M`
+      `frontend/e2e/`
 
 ### DX & tooling
 
@@ -180,6 +177,14 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-22** ✅ 2026-09-10 — `e2e/billing-flow.spec.ts` is a real happy path: register a tenant via UI → onboarding → client → two-line Rechnung (asserts CHF 270.25) → Vorschau (`/preview` 200 `application/pdf`) → `/pdf` with the session token. `playwright.config.ts` fixed for ESM (`__dirname` crashed before any test). CI job `e2e`: Postgres service, `alembic upgrade head`, uvicorn :8000, Playwright with its own Vite dev server. Portal/multi-tenant specs continue as R-100.
+- **R-21** ✅ 2026-09-10 — vitest 4.1.11 (`npm run test`, in the frontend CI job). 21 tests in `src/test/`: `lib/errors.ts` fallback chain, `line-item-utils` (`calculateTotals`/`lineTotal` extracted from `LineItemsEditor`), `lib/optimistic.ts` rollback.
+- **R-72** ✅ 2026-09-10 — `_esc()` + `_Escaped` proxy in `pdf_generator.py`: names, addresses, UID, notes and QR-slip text are XML-escaped before `Paragraph`. "Bold <b> Bauer" no longer 500s and "<Holding>" is printed instead of dropped. pypdf added to dev requirements for text assertions.
+- **R-70** ✅ 2026-09-10 — `duplicate_document` derives `due_date` only when `payment_terms_days` is set.
+- **R-69** ✅ 2026-09-10 — `update_document` no longer crashes on `payment_terms_days=null`, keeps an explicitly sent `due_date`; `DocumentRead`/`PortalDocumentRead` declare the field nullable (it was already nullable in the DB). `api.generated.ts` regenerated.
+- **R-66** ✅ 2026-09-10 — `update_document` always recalculates totals from the stored items; a discount-only PUT is persisted correctly. Test in `test_document_edits.py`.
+- **R-49** ✅ 2026-09-10 — Rounding matrix in `test_totals.py` (multi-rate 8.1/2.6/0, discount before VAT, per-line VAT rounding pinned, half-cent cases, empty document). `services/money.py::round_to_5_rappen()` helper + tests — **not** applied to document totals (QR-bill amounts keep the cent). Findings opened as R-98 (half-even vs half-up) and R-99 (3-decimal quantity).
+- **R-51** ✅ 2026-09-10 — `tests/test_qr_reference.py` (28): ISO 11649 vector `RF18539007547034`, independent MOD 97-10 check, sanitization, `validate_creditor_reference()`, recursive MOD10 (`21000000000313947143000901` → 7) via new `mod10_recursive()`/`generate_qr_reference()` (QRR, not wired into the PDF — needs a QR-IBAN, `is_qr_iban()` added), EUR vs CHF in the SPC payload. **Bug fixed:** references over 25 characters were generated for long document numbers; body is now capped at 21. Backend tests after R-51/R-49/R-66…R-72: 58 → **112** passed + 3 strict xfails.
 - **R-83** ✅ 2026-09-10 — Step 1: `tests/test_tenant_scoping_guard.py` parses every `db.query()` in `app/api/*.py` on a model with a `tenant_id` column and fails unless it goes through `scoped()`/`get_or_404()` or filters `tenant_id ==` itself (allowlist with reasons: email/jti/portal-token lookups). Step 2 (RLS) continues as R-83b. Tests 56 → **58**.
 - **R-48** ✅ 2026-09-10 — `services/tenancy.py`: `scoped(db, Model, tenant_id)` + `get_or_404()`; clients, services, settings, users, dashboard, documents migrated with identical SQL. Error shape is already uniform via the R-27 envelope; a paginated-response wrapper is not needed while both paginated lists share the R-13 shape.
 - **R-92b** ✅ 2026-09-10 — `tenant_or_ip_key()`: `tenant:<tid>` from a valid access token, else `ip:<addr>`. Document create/pdf/preview/send-email, bulk ×3 and logo upload at `120/minute` per tenant; auth routes stay per IP. Limiter keyed by endpoint, not URL, so `/{id}/pdf` shares one bucket. Tests 51 → **56**.
@@ -218,10 +223,10 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 |---|---|---|
 | 0 | Recon / system map | ✅ done (re-verified 2026-09-04) |
 | 0.5 | Risk fixes before platform work | ✅ R-89, R-27, R-91, R-90 (branch `feat/phase0-risks`, 2026-09-09) |
-| 1 | Architecture & code quality | audit done (R-45), R-48 helpers ✅ → NOW: R-66 · NEXT: R-46 → R-47 → R-85 → R-86 |
+| 1 | Architecture & code quality | audit done (R-45), R-48 helpers ✅, R-66 ✅ · NEXT: R-46 → R-47 → R-85 → R-86 |
 | 2 | Security & data protection | core done, R-83 step 1 + R-92b ✅; open: R-15b, R-83b, R-53, R-65, R-75, R-76, R-55, R-56 |
 | 3 | Performance | not started: R-26, R-58, R-82, R-84, R-59 |
 | 4 | UX / a11y / frontend | not started: R-24, R-60, R-62, R-61, R-88, R-25, R-23, R-29 |
-| 5 | Testing & reliability | scaffold done; open: R-21, R-22, R-49, R-51, R-52, R-57 |
+| 5 | Testing & reliability | R-21, R-22, R-49, R-51 ✅; open: R-52, R-57, R-98, R-99, R-100 |
 | 6 | DX & tooling | CI/docker/scripts done; open: R-78, R-79, R-80, R-81, R-63, R-64, R-30 |
 | 4b | Observability | ✅ R-92 · open: R-75, R-84 |
