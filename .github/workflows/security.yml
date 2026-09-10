@@ -68,8 +68,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      # Blocking at high. Two moderate react-router advisories remain and
-      # need a v6 -> v7 major upgrade, tracked as R-42.
+      # Blocking at high. (react-router is on v7 since R-42; audit is clean.)
       #
       # `npm audit` calls the npmjs advisory endpoint at run time, so a
       # registry outage ("socket hang up", "audit endpoint returned an

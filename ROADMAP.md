@@ -27,10 +27,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       discount-only update leaves subtotal/VAT/total stale in the DB. Move recalc out of the
       `if data.line_items is not None` branch; always recalc from stored items. — `H` / `S`
       `backend/app/api/documents.py` (`update_document`) · test in `test_totals.py`
-- [ ] **R-42** ⚠️ **Reopened 2026-09-04.** Marked done in PR #43, but `main@fc9fce7` has
-      `react-router-dom ^6.30.3` in `package.json` and lockfile (resolved 6.30.6). Either the bump was
-      reverted or never merged. Re-apply `^7.x`, run `tsc` + e2e. — `M` / `S`
-      `frontend/package.json:35`
 - [ ] **R-35** `test.pdf` and `test_export.csv` are tracked at the repo root — test artifacts in version control. — `L` / `S`
       **Reopened 2026-09-04: still committed (26,170 B / 2,399 B). `git rm` + already gitignored.**
 - [ ] **R-67** `send_document_email_endpoint` passes ORM objects (`doc`, `company`) into a
@@ -189,6 +185,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-42** ✅ 2026-09-10 — `react-router-dom` ^6.30 → ^7.18 (only `BrowserRouter/Routes/Link/useNavigate/useParams/useLocation` used, no API change). `npm audit` = 0 vulnerabilities. tsc · lint · build green; e2e to be run by owner.
 - **R-89** ✅ 2026-09-09 — `/docs`, `/redoc`, `/openapi.json` disabled when `APP_ENV=production`. 4 tests.
 - **R-27** ✅ 2026-09-09 — JSON logging, `X-Request-ID` + `Server-Timing`, uniform error envelope
   (`detail` kept **and** `error:{code,message,request_id}` added — additive, non-breaking). `print()` gone. 5 tests.
