@@ -7,6 +7,7 @@ from app.auth import get_tenant_id, hash_password, require_admin
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import InviteRequest, InviteResponse, UserRead, UserUpdate
+from app.services.tenancy import get_or_404, scoped
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -17,12 +18,7 @@ def list_users(
     tenant_id: int = Depends(get_tenant_id),
     _admin: User = Depends(require_admin),
 ):
-    return (
-        db.query(User)
-        .filter(User.tenant_id == tenant_id)
-        .order_by(User.created_at.asc())
-        .all()
-    )
+    return scoped(db, User, tenant_id).order_by(User.created_at.asc()).all()
 
 
 @router.post("/invite", response_model=InviteResponse, status_code=201)
@@ -64,9 +60,7 @@ def update_user(
     tenant_id: int = Depends(get_tenant_id),
     admin: User = Depends(require_admin),
 ):
-    user = db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = get_or_404(db, User, user_id, tenant_id)
     if data.role is not None:
         if data.role not in ("admin", "editor", "viewer"):
             raise HTTPException(status_code=400, detail="Invalid role")
@@ -91,9 +85,7 @@ def remove_user(
     tenant_id: int = Depends(get_tenant_id),
     admin: User = Depends(require_admin),
 ):
-    user = db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = get_or_404(db, User, user_id, tenant_id)
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     db.delete(user)

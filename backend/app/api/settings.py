@@ -10,11 +10,12 @@ from app.limiter import TENANT_LIMIT, limiter, tenant_or_ip_key
 from app.models.settings import CompanySettings
 from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.services.storage import get_storage
+from app.services.tenancy import scoped
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
-    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
+    settings = scoped(db, CompanySettings, tenant_id).first()
     if not settings:
         raise HTTPException(status_code=404, detail="Settings not found")
     return settings
@@ -96,9 +97,7 @@ async def upload_logo(
 
 @router.post("/onboarding-complete", dependencies=[Depends(require_editor)])
 def complete_onboarding(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
-    if not settings:
-        raise HTTPException(status_code=404, detail="Settings not found")
+    settings = _get_settings(db, tenant_id)
     settings.onboarding_completed = True
     db.commit()
     return {"status": "ok"}
