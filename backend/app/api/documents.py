@@ -29,6 +29,7 @@ from app.schemas.document import (
 from app.services.number_generator import generate_document_number
 from app.services.pdf_generator import generate_invoice_pdf
 from app.services.sanitizer import sanitize_text
+from app.services.tenancy import scoped
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -67,7 +68,7 @@ def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal
 
 
 def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = False, with_client: bool = False) -> Document:
-    query = db.query(Document).filter(Document.id == doc_id, Document.tenant_id == tenant_id)
+    query = scoped(db, Document, tenant_id).filter(Document.id == doc_id)
     if with_items:
         query = query.options(joinedload(Document.line_items))
     if with_client:
@@ -80,15 +81,15 @@ def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = Fal
 
 def _load_full(db: Session, doc_id: int, tenant_id: int) -> Document:
     return (
-        db.query(Document)
+        scoped(db, Document, tenant_id)
         .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id == doc_id, Document.tenant_id == tenant_id)
+        .filter(Document.id == doc_id)
         .first()
     )
 
 
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
-    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).first()
+    settings = scoped(db, CompanySettings, tenant_id).first()
     if not settings:
         raise HTTPException(status_code=500, detail="Company settings not configured")
     return settings
@@ -106,7 +107,7 @@ def list_documents(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
-    query = db.query(Document).options(joinedload(Document.client)).filter(Document.tenant_id == tenant_id)
+    query = scoped(db, Document, tenant_id).options(joinedload(Document.client))
     if document_type:
         query = query.filter(Document.document_type == document_type)
     if status:
@@ -144,11 +145,7 @@ def export_documents_csv(
     tenant_id: int = Depends(get_tenant_id),
 ):
 
-    query = (
-        db.query(Document)
-        .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.tenant_id == tenant_id)
-    )
+    query = scoped(db, Document, tenant_id).options(joinedload(Document.line_items), joinedload(Document.client))
     if document_type:
         query = query.filter(Document.document_type == document_type)
     if status:
@@ -355,9 +352,9 @@ def duplicate_document(
     tenant_id: int = Depends(get_tenant_id),
 ):
     original = (
-        db.query(Document)
+        scoped(db, Document, tenant_id)
         .options(joinedload(Document.line_items))
-        .filter(Document.id == doc_id, Document.tenant_id == tenant_id)
+        .filter(Document.id == doc_id)
         .first()
     )
     if not original:
@@ -563,7 +560,7 @@ def send_document_email_endpoint(
 @router.post("/bulk/status", dependencies=[Depends(require_editor)])
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
 def bulk_update_status(request: Request, data: BulkStatusRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    docs = db.query(Document).filter(Document.id.in_(data.document_ids), Document.tenant_id == tenant_id).all()
+    docs = scoped(db, Document, tenant_id).filter(Document.id.in_(data.document_ids)).all()
     if not docs:
         raise HTTPException(status_code=404, detail="No documents found")
 
@@ -590,9 +587,9 @@ def bulk_update_status(request: Request, data: BulkStatusRequest, db: Session = 
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
 def bulk_send_email(request: Request, data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = (
-        db.query(Document)
+        scoped(db, Document, tenant_id)
         .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id.in_(data.document_ids), Document.tenant_id == tenant_id)
+        .filter(Document.id.in_(data.document_ids))
         .all()
     )
     company = _get_settings(db, tenant_id)
@@ -630,9 +627,9 @@ def bulk_send_email(request: Request, data: BulkActionRequest, db: Session = Dep
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
 def bulk_download_pdf_zip(request: Request, data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = (
-        db.query(Document)
+        scoped(db, Document, tenant_id)
         .options(joinedload(Document.line_items), joinedload(Document.client))
-        .filter(Document.id.in_(data.document_ids), Document.tenant_id == tenant_id)
+        .filter(Document.id.in_(data.document_ids))
         .all()
     )
     if not docs:

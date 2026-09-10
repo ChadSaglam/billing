@@ -10,38 +10,37 @@ from app.database import get_db
 from app.models.client import Client
 from app.models.document import Document
 from app.schemas.dashboard import DashboardStats, MonthlyRevenue, StatusCount
+from app.services.tenancy import scoped
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 @router.get("", response_model=DashboardStats)
 def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    base = Document.tenant_id == tenant_id
     rechnung = Document.document_type == "rechnung"
 
     total_revenue = (
         db.query(func.coalesce(func.sum(Document.total), 0))
-        .filter(base, rechnung, Document.status == "paid")
+        .filter(Document.tenant_id == tenant_id, rechnung, Document.status == "paid")
         .scalar()
     ) or Decimal("0")
 
     outstanding = (
         db.query(func.coalesce(func.sum(Document.total), 0))
-        .filter(base, rechnung, Document.status == "sent")
+        .filter(Document.tenant_id == tenant_id, rechnung, Document.status == "sent")
         .scalar()
     ) or Decimal("0")
 
     overdue_count = (
         db.query(func.count(Document.id))
-        .filter(base, rechnung, Document.status == "overdue")
+        .filter(Document.tenant_id == tenant_id, rechnung, Document.status == "overdue")
         .scalar()
     ) or 0
 
     client_count = db.query(func.count(Client.id)).filter(Client.tenant_id == tenant_id).scalar() or 0
 
     recent_docs = (
-        db.query(Document)
+        scoped(db, Document, tenant_id)
         .options(joinedload(Document.client))
-        .filter(base)
         .order_by(Document.created_at.desc())
         .limit(10)
         .all()
@@ -61,7 +60,7 @@ def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_te
                 case((Document.status.in_(["sent", "overdue"]), Document.total), else_=Decimal("0"))
             ), 0).label("outstanding"),
         )
-        .filter(base, rechnung, Document.date >= twelve_months_ago)
+        .filter(Document.tenant_id == tenant_id, rechnung, Document.date >= twelve_months_ago)
         .group_by(month_label)
         .order_by(month_label)
         .all()
@@ -75,7 +74,7 @@ def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_te
     # Status distribution (all document types)
     status_rows = (
         db.query(Document.status, func.count(Document.id).label("count"))
-        .filter(base)
+        .filter(Document.tenant_id == tenant_id)
         .group_by(Document.status)
         .all()
     )
