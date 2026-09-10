@@ -289,12 +289,15 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
         for item_data in data.line_items:
             db.add(_build_line_item(item_data, doc_id, tenant_settings.default_vat_rate))
         db.flush()
-        items = db.query(LineItem).filter(LineItem.document_id == doc_id).all()
-        subtotal, discount_amount, vat_amount, total = _recalc_totals(items, doc.discount_percent)
-        doc.subtotal = subtotal
-        doc.discount_amount = discount_amount
-        doc.vat_amount = vat_amount
-        doc.total = total
+
+    # Always recalc from the stored items: a discount-only edit changes the
+    # totals just as much as a line-item edit does (R-66).
+    items = db.query(LineItem).filter(LineItem.document_id == doc_id).all()
+    subtotal, discount_amount, vat_amount, total = _recalc_totals(items, doc.discount_percent)
+    doc.subtotal = subtotal
+    doc.discount_amount = discount_amount
+    doc.vat_amount = vat_amount
+    doc.total = total
 
     if "date" in update_data or "payment_terms_days" in update_data:
         doc.due_date = doc.date + timedelta(days=doc.payment_terms_days)
