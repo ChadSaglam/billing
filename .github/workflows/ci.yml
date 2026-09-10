@@ -129,6 +129,82 @@ jobs:
           path: frontend/dist
           retention-days: 7
 
+  e2e:
+    name: E2E (Playwright happy path)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: billing_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci -d billing_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/billing_e2e
+      SECRET_KEY: ci-only-secret-not-used-in-production
+      ALLOWED_ORIGINS: http://localhost:5173
+      FRONTEND_URL: http://localhost:5173
+      APP_ENV: test
+      VITE_API_URL: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend
+        working-directory: backend
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libpq-dev
+          pip install -r requirements.txt
+
+      - name: Migrate and start the API
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          nohup python -m uvicorn app.main:app --port 8000 > /tmp/uvicorn.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8000/api/health && break
+            sleep 1
+          done
+          curl -fsS http://localhost:8000/api/health
+
+      - name: Install frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Playwright
+        working-directory: frontend
+        run: npx playwright test
+
+      - name: API log on failure
+        if: failure()
+        run: tail -n 200 /tmp/uvicorn.log
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
+
   docker:
     name: Docker build & compose smoke test
     runs-on: ubuntu-latest
