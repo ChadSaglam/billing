@@ -1,4 +1,4 @@
-"""Edit paths that used to corrupt or crash a document (R-66, R-69)."""
+"""Edit paths that used to corrupt or crash a document (R-66, R-69, R-70)."""
 import uuid
 from decimal import Decimal
 
@@ -96,3 +96,20 @@ def test_update_recomputes_due_date_from_terms_when_not_sent(client, make_tenant
     resp = client.put(f"/api/documents/{doc['id']}", json={"date": "2026-02-01"}, headers=t["headers"])
     assert resp.status_code == 200, resp.text
     assert resp.json()["due_date"] == "2026-02-11"
+
+
+# ── R-70 ──────────────────────────────────────────────────────
+
+def test_duplicate_with_null_payment_terms_does_not_crash(client, make_tenant):
+    t = make_tenant()
+    cid = _client(client, t["headers"])
+    doc = _invoice(client, t["headers"], cid)
+    resp = client.put(f"/api/documents/{doc['id']}", json={"payment_terms_days": None}, headers=t["headers"])
+    assert resp.status_code == 200, resp.text
+
+    resp = client.post(f"/api/documents/{doc['id']}/duplicate", headers=t["headers"])
+    assert resp.status_code == 200, resp.text
+    clone = resp.json()
+    assert clone["id"] != doc["id"]
+    assert clone["status"] == "draft"
+    assert Decimal(clone["total"]) == Decimal(doc["total"])

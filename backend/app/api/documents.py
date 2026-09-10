@@ -371,13 +371,19 @@ def duplicate_document(
 
     new_number = generate_document_number(db, original.document_type, tenant_id)
 
+    today = dt.date.today()
     clone = Document(
         tenant_id=tenant_id,
         document_type=original.document_type,
         document_number=new_number,
         client_id=original.client_id,
-        date=dt.date.today(),
-        due_date=dt.date.today() + dt.timedelta(days=original.payment_terms_days),
+        date=today,
+        # payment_terms_days is nullable — no terms, no derived due date (R-70).
+        due_date=(
+            today + dt.timedelta(days=original.payment_terms_days)
+            if original.payment_terms_days is not None
+            else None
+        ),
         payment_terms_days=original.payment_terms_days,
         status="draft",
         subtotal=original.subtotal,
