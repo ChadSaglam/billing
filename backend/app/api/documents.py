@@ -6,12 +6,13 @@ from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_tenant_id, require_editor
 from app.database import get_db
+from app.limiter import TENANT_LIMIT, limiter, tenant_or_ip_key
 from app.models.document import Document
 from app.models.line_item import LineItem
 from app.models.settings import CompanySettings
@@ -238,7 +239,8 @@ def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
 
 
 @router.post("", response_model=DocumentRead, status_code=201, dependencies=[Depends(require_editor)])
-def create_document(data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
+def create_document(request: Request, data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc_data = data.model_dump(exclude={"line_items", "document_number"})
     tenant_settings = _get_settings(db, tenant_id)
     # A client that did not send a currency gets the tenant's default, not a
@@ -459,7 +461,8 @@ def generate_portal_token(doc_id: int, db: Session = Depends(get_db), tenant_id:
 
 # ── PDF ───────────────────────────────────────────────
 @router.get("/{doc_id}/pdf")
-def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
+def download_pdf(request: Request, doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     doc = _load_full(db, doc_id, tenant_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -477,7 +480,9 @@ def download_pdf(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
 
 
 @router.get("/{doc_id}/preview")
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
 def preview_pdf(
+    request: Request,
     doc_id: int,
     template: str = Query("modern"),
     db: Session = Depends(get_db),
@@ -511,7 +516,9 @@ def preview_pdf(
 
 
 @router.post("/{doc_id}/send-email", dependencies=[Depends(require_editor)])
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
 def send_document_email_endpoint(
+    request: Request,
     doc_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -554,7 +561,8 @@ def send_document_email_endpoint(
 
 # ── Bulk Actions ──────────────────────────────────────
 @router.post("/bulk/status", dependencies=[Depends(require_editor)])
-def bulk_update_status(data: BulkStatusRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
+def bulk_update_status(request: Request, data: BulkStatusRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = db.query(Document).filter(Document.id.in_(data.document_ids), Document.tenant_id == tenant_id).all()
     if not docs:
         raise HTTPException(status_code=404, detail="No documents found")
@@ -579,7 +587,8 @@ def bulk_update_status(data: BulkStatusRequest, db: Session = Depends(get_db), t
 
 
 @router.post("/bulk/send-email", dependencies=[Depends(require_editor)])
-def bulk_send_email(data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
+def bulk_send_email(request: Request, data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = (
         db.query(Document)
         .options(joinedload(Document.line_items), joinedload(Document.client))
@@ -618,7 +627,8 @@ def bulk_send_email(data: BulkActionRequest, db: Session = Depends(get_db), tena
 
 
 @router.post("/bulk/pdf-zip", dependencies=[Depends(require_editor)])
-def bulk_download_pdf_zip(data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
+def bulk_download_pdf_zip(request: Request, data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     docs = (
         db.query(Document)
         .options(joinedload(Document.line_items), joinedload(Document.client))

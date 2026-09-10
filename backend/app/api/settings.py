@@ -1,11 +1,12 @@
 import io
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth import get_tenant_id, require_editor
 from app.database import get_db
+from app.limiter import TENANT_LIMIT, limiter, tenant_or_ip_key
 from app.models.settings import CompanySettings
 from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.services.storage import get_storage
@@ -42,7 +43,9 @@ ALLOWED_LOGO_TYPES = {
 
 
 @router.post("/logo", dependencies=[Depends(require_editor)])
+@limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
 async def upload_logo(
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
