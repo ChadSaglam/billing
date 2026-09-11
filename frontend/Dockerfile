@@ -20,8 +20,11 @@ RUN npm ci
 
 COPY . .
 
+# Inside the container vite always listens on 5173 — compose publishes it as
+# FRONTEND_PORT. vite.config.ts defaults to 5050 for local dev, so the port
+# must be pinned here or the compose healthcheck (and the mapping) miss it.
 EXPOSE 5173
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 
 # ── build: production bundle ────────────────────────────────────────────
 FROM node:20-slim AS build
