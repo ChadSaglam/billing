@@ -1,0 +1,75 @@
+# Fast, local gates. Install once with: make setup  (or: make hooks)
+default_install_hook_types: [pre-commit, pre-push]
+
+# Generated or build-derived files: never reformat, never gate a commit on them.
+exclude: |
+  (?x)^(
+    frontend/src/types/api\.generated\.ts|
+    frontend/package-lock\.json|
+    frontend/dist/.*|
+    frontend/.*\.tsbuildinfo|
+    backend/alembic/versions/.*|
+    .*\.min\.(js|css)
+  )$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+        # tsconfig / VS Code files are JSONC (comments) — not strict JSON.
+        exclude: ^(frontend/(tsconfig.*\.json|e2e/tsconfig\.json)|\.vscode/.*\.json)$
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: detect-private-key
+      - id: mixed-line-ending
+
+  # Same version as backend/requirements-dev.txt; ruff discovers
+  # backend/pyproject.toml on its own for every file under backend/.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.23.3
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck (scripts/)
+        # Skips quietly when shellcheck is not installed (it is optional locally).
+        # Errors only for now: dev.sh / test.sh / project-overview.sh carry ~25
+        # pre-existing warnings (SC2164, SC2034 via sourced common.sh). Tighten
+        # to --severity=warning once those are cleaned up.
+        entry: bash -c 'command -v shellcheck >/dev/null || { echo "shellcheck not installed - skipped"; exit 0; }; shellcheck -x --severity=error "$@"' --
+        language: system
+        files: ^scripts/.*\.sh$
+
+      # Frontend gates run once per push, not per file (eslint/tsc are slow to boot).
+      - id: eslint
+        name: ESLint (frontend)
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|mjs|cjs)$
+        pass_filenames: false
+        stages: [pre-push]
+      - id: tsc
+        name: TypeScript typecheck (frontend)
+        entry: bash -c 'cd frontend && npx tsc -b --noEmit'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|json)$
+        pass_filenames: false
+        stages: [pre-push]

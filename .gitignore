@@ -1,5 +1,9 @@
 # Python
 __pycache__/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
 *.pyc
 *.pyo
 *.egg-info/
@@ -11,6 +15,9 @@ venv/
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
+playwright-report/
+test-results/
 
 # IDE
 .vscode/

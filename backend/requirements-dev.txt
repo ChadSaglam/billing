@@ -5,3 +5,5 @@ ruff==0.16.4
 pip-audit==2.7.3
 # Text extraction from generated PDFs in tests (R-72).
 pypdf==3.17.4
+# Git hooks (R-63): `make hooks` installs .pre-commit-config.yaml.
+pre-commit==4.6.2

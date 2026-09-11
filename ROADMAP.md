@@ -2,7 +2,7 @@
 
 > One running list. Never duplicated — items move between sections, they don't get re-added.
 > Legend: severity `C`ritical / `H`igh / `M`edium / `L`ow · effort `S` (<1h) / `M` (half day) / `L` (multi-day)
-> IDs: `R-xx` = work item (next free: **R-106**) · `P-xx` = parked idea (next free: **P-07**)
+> IDs: `R-xx` = work item (next free: **R-107**) · `P-xx` = parked idea (next free: **P-07**)
 > Cross-product items (SSO, contracts, design tokens) live in `chadev-platform/ROADMAP.md`, not here.
 > Updated: 2026-09-11
 
@@ -130,6 +130,10 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       reversal so buchhaltung can storno the booking created from `invoice.paid`. Parked from the
       events contract v1 (buchhaltung side: B-36). Needs a `version` bump decision first. — `M` / `M`
       `backend/app/services/events.py` · `backend/app/api/documents.py`
+- [ ] **R-106** Stripe payments (ADR-003 in chadev-platform): `stripe_customer_id` on the tenant,
+      Checkout + Customer Portal, webhook receiver, plan gate on `tenant.subscription_plan`. Supersedes P-01
+      once the security gate (R-15b, R-83b, R-53) is closed. — `M` / `L`
+      `backend/app/config.py` · `backend/app/models/tenant.py` · `backend/app/api/`
 
 ### Testing & reliability
 
@@ -150,7 +154,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 - [ ] **R-81** CI hygiene: installs cairo/pango libs that R-18 removed; `ruff format` is
       `continue-on-error`; model/migration drift check only warns. Make all three strict. — `M` / `S`
       `.github/workflows/ci.yml:49-55,68,78`
-- [ ] **R-63** Pre-commit hooks: ruff + eslint + gitleaks. — `M` / `S`
 - [ ] **R-64** PR template with R-ID + north-star column + test-plan checklist. — `L` / `S`
 - [ ] **R-30** Soft-delete for documents (Swiss retention rules). — `H` / `M`
 
@@ -169,6 +172,14 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-63** ✅ 2026-09-11 — Pre-commit hooks (`.pre-commit-config.yaml`, installed by `make hooks`):
+  pre-commit-hooks (whitespace, EOF, yaml/json/toml, merge markers, large files, private keys), ruff +
+  ruff-format on `backend/`, gitleaks, shellcheck on `scripts/`; ESLint + `tsc -b --noEmit` at pre-push.
+  Generated files excluded (`api.generated.ts`, `package-lock.json`, `alembic/versions`). Same commit
+  (platform Phase 7): `Makefile` (`make help` lists every target, `make check` = lint + typecheck +
+  tests), `AGENTS.md` + `CLAUDE.md`, `scripts/status.sh` → `STATUS.md` (`make status`),
+  `npm run typecheck` (`tsc -b --noEmit` — the CI `tsc --noEmit` step checks nothing because the root
+  tsconfig has `files: []`; fix the CI step under R-81).
 - **R-104** ✅ 2026-09-11 — Outbound platform events (contracts/events.md): `outbound_events` outbox
   (migration `e3f4a5b6c7d8`, model `OutboundEvent`), `services/events.py` with `emit()` (same transaction as
   the business change) and `deliver_pending()` (HMAC-SHA256 `sha256=` over `"{ts}.{body}"`, httpx 10 s,
@@ -281,7 +292,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 | 2 | Security & data protection | core done, R-83 step 1 + R-92b + R-75 ✅; open: R-15b, R-83b, R-53, R-65, R-76, R-55, R-56 |
 | 3 | Performance | R-84 ✅; open: R-26, R-58, R-82, R-59 |
 | 4 | UX / a11y / frontend | R-25, R-24, R-23 ✅ (2026-09-11); open: R-101, R-102, R-60, R-62, R-61, R-88, R-29 |
-| 6.1/6.2 | Platform: SSO + events (billing side) | ✅ R-103, R-104 (2026-09-11); open: R-105 |
+| 6.1/6.2 | Platform: SSO + events (billing side) | ✅ R-103, R-104 (2026-09-11); open: R-105, R-106 |
 | 5 | Testing & reliability | R-21, R-22, R-49, R-51 ✅, axe e2e (R-23) ✅; open: R-52, R-57, R-98, R-99, R-100 |
-| 6 | DX & tooling | CI/docker/scripts done; open: R-78, R-79, R-80, R-81, R-63, R-64, R-30 |
+| 6 | DX & tooling | CI/docker/scripts done; Makefile, AGENTS.md, pre-commit (R-63), STATUS.md ✅ (2026-09-11); open: R-78, R-79, R-80, R-81, R-64, R-30 |
 | 4b | Observability | ✅ R-92, R-75, R-84 |

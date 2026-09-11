@@ -121,4 +121,3 @@ def install_error_handlers(app: FastAPI) -> None:
             ),
             headers={REQUEST_ID_HEADER: current_request_id()},
         )
-
