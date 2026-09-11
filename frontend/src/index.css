@@ -1,5 +1,5 @@
-/* Shared chadev design tokens (platform 1.6) — must come first so the
-   shadcn variables below can reference them. */
+/* Shared chadev design tokens (platform 1.6 / 5.3 colours) — must come first
+   so the shadcn variables below can reference them. */
 @import './tokens.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tw-animate-css";
@@ -20,44 +20,47 @@
 }
 
 @layer base {
+  /* shadcn variables ↔ chadev tokens (platform 5.3, R-23).
+     Tailwind wraps these as hsl(var(--x)), so each mapped entry is the HSL
+     triplet of the hex token it mirrors — the hex is stated in the comment.
+     Converting here (instead of switching the Tailwind config to plain
+     colours) keeps every existing `bg-primary/10`-style opacity utility
+     working and touches no component. If a token changes in
+     tokens.css, update the triplet next to it. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    --background: 0 0% 98%;            /* --cd-color-bg      #fafafa */
+    --foreground: 221 39% 11%;         /* --cd-color-fg      #111827 */
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 221 39% 11%;    /* --cd-color-fg */
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 12%;
-    --primary-foreground: 0 0% 97%;
+    --popover-foreground: 221 39% 11%; /* --cd-color-fg */
+    --primary: 226 80% 52%;            /* --cd-color-brand   #2451e6 · 6.19:1 on white */
+    --primary-foreground: 0 0% 100%;   /* --cd-color-brand-fg #ffffff */
+    --primary-hover: 226 73% 44%;      /* --cd-color-brand-hover #1e44c4 */
+    --primary-soft: 219 100% 97%;      /* --cd-color-brand-soft  #eef4ff */
     --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 12%;
+    --secondary-foreground: 221 39% 11%;
     --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 40%;
+    --muted-foreground: 220 9% 46%;    /* --cd-color-muted   #6b7280 · 4.83:1 on white */
     --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 12%;
-    --destructive: 0 84% 60%;
+    --accent-foreground: 221 39% 11%;
+    --destructive: 0 74% 42%;          /* --cd-color-danger  #b91c1c · 6.47:1 on white */
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 50%;
-    /* Mapped to the shared tokens where a 1:1 exists. The colour tokens are
-       hex while the shadcn variables are HSL triplets wrapped in hsl(), so
-       they stay local for now. Still unmapped: --background/--foreground
-       (--cd-color-bg/-fg), --muted-foreground (--cd-color-muted),
-       --border/--input (--cd-color-border), --primary (--cd-color-brand,
-       also a different hue), --destructive (--cd-color-danger),
-       success/warning (no shadcn counterpart), --cd-space-* (Tailwind
-       spacing scale), --cd-font-mono (Tailwind default mono stack). */
+    --success: 142 72% 29%;            /* --cd-color-success #15803d */
+    --warning: 26 90% 37%;             /* --cd-color-warning #b45309 */
+    --border: 220 13% 91%;             /* --cd-color-border  #e5e7eb */
+    --input: 220 13% 91%;              /* --cd-color-border */
+    --ring: 226 80% 52%;               /* --cd-color-brand */
     --radius: var(--cd-radius);
     --sidebar: 0 0% 97%;
-    --sidebar-foreground: 0 0% 9%;
-    --sidebar-primary: 0 0% 12%;
-    --sidebar-primary-foreground: 0 0% 97%;
+    --sidebar-foreground: 221 39% 11%;
+    --sidebar-primary: 226 80% 52%;    /* --cd-color-brand */
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 0 0% 12%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 0 0% 50%;
-    --chart-1: 220 70% 55%;
+    --sidebar-accent-foreground: 221 39% 11%;
+    --sidebar-border: 220 13% 91%;     /* --cd-color-border */
+    --sidebar-ring: 226 80% 52%;       /* --cd-color-brand */
+    --chart-1: 226 80% 52%;            /* --cd-color-brand */
     --chart-2: 250 60% 50%;
     --chart-3: 260 60% 45%;
     --chart-4: 265 60% 40%;
@@ -65,34 +68,38 @@
   }
 
   .dark {
-    --background: 0 0% 9%;
-    --foreground: 0 0% 97%;
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 97%;
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 97%;
-    --primary: 0 0% 90%;
-    --primary-foreground: 0 0% 12%;
-    --secondary: 0 0% 17%;
-    --secondary-foreground: 0 0% 97%;
-    --muted: 0 0% 17%;
-    --muted-foreground: 0 0% 50%;
-    --accent: 0 0% 17%;
-    --accent-foreground: 0 0% 97%;
-    --destructive: 0 72% 51%;
+    --background: 223 39% 7%;          /* --cd-color-bg      #0b0f19 */
+    --foreground: 220 14% 96%;         /* --cd-color-fg      #f3f4f6 */
+    --card: 223 30% 11%;
+    --card-foreground: 220 14% 96%;    /* --cd-color-fg */
+    --popover: 223 30% 11%;
+    --popover-foreground: 220 14% 96%; /* --cd-color-fg */
+    --primary: 224 91% 60%;            /* --cd-color-brand   #3b6cf6 · white on it 4.50:1 */
+    --primary-foreground: 0 0% 100%;   /* --cd-color-brand-fg */
+    --primary-hover: 224 92% 66%;      /* --cd-color-brand-hover #5b84f8 */
+    --primary-soft: 226 57% 21%;       /* --cd-color-brand-soft  #172554 */
+    --secondary: 223 25% 16%;
+    --secondary-foreground: 220 14% 96%;
+    --muted: 223 25% 16%;
+    --muted-foreground: 218 11% 65%;   /* --cd-color-muted   #9ca3af · 7.54:1 on bg */
+    --accent: 223 25% 16%;
+    --accent-foreground: 220 14% 96%;
+    --destructive: 0 74% 42%;          /* --cd-color-danger  #b91c1c (no dark variant in tokens) */
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 20%;
-    --input: 0 0% 22%;
-    --ring: 0 0% 40%;
-    --sidebar: 0 0% 12%;
-    --sidebar-foreground: 0 0% 97%;
-    --sidebar-primary: 265 60% 40%;
-    --sidebar-primary-foreground: 0 0% 97%;
-    --sidebar-accent: 0 0% 17%;
-    --sidebar-accent-foreground: 0 0% 97%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 0 0% 40%;
-    --chart-1: 220 70% 55%;
+    --success: 142 72% 29%;            /* --cd-color-success */
+    --warning: 26 90% 37%;             /* --cd-color-warning */
+    --border: 215 28% 17%;             /* --cd-color-border  #1f2937 */
+    --input: 215 28% 17%;              /* --cd-color-border */
+    --ring: 224 91% 60%;               /* --cd-color-brand */
+    --sidebar: 223 30% 11%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-primary: 224 91% 60%;    /* --cd-color-brand */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 223 25% 16%;
+    --sidebar-accent-foreground: 220 14% 96%;
+    --sidebar-border: 215 28% 17%;     /* --cd-color-border */
+    --sidebar-ring: 224 91% 60%;       /* --cd-color-brand */
+    --chart-1: 224 91% 60%;            /* --cd-color-brand */
     --chart-2: 250 60% 50%;
     --chart-3: 260 60% 45%;
     --chart-4: 265 60% 40%;
@@ -122,7 +129,7 @@
 .dark [data-state="open"][role="dialog"],
 .dark [data-radix-dialog-content],
 .dark .fixed[data-state="open"] {
-  background-color: #1f1f1f !important;
+  background-color: hsl(var(--card)) !important;
 }
 
 /* Radix dialog overlay */
