@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { getClients, getDocuments } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useT, statusLabel } from "@/lib/i18n";
 
 interface Props {
@@ -18,6 +19,8 @@ interface Props {
 export default function CommandPalette({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(boxRef, open);
   const { t, locale } = useT();
   const [search, setSearch] = useState("");
 
@@ -191,9 +194,9 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
       `}</style>
 
       <div className="cmd-root">
-        <div className="cmd-backdrop" onClick={() => onOpenChange(false)} />
+        <div className="cmd-backdrop" onClick={() => onOpenChange(false)} aria-hidden="true" />
         <div className="cmd-wrap" onClick={() => onOpenChange(false)}>
-          <div className="cmd-box" onClick={(e) => e.stopPropagation()}>
+          <div ref={boxRef} role="dialog" aria-modal="true" aria-label={t("cmd.placeholder")} className="cmd-box" onClick={(e) => e.stopPropagation()}>
             <Command loop>
               <div className="cmd-search">
                 <Search />

@@ -226,7 +226,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="flex-1 text-left">{t('nav.search')}</span>
-              <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
                 ⌘K
               </kbd>
             </button>

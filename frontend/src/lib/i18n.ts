@@ -227,6 +227,8 @@ const de = {
   'clients.noneCombobox': 'Keine Kunden gefunden.',
   'clients.createNew': 'Neuen Kunden erstellen',
   'clients.clientLoadFailed': 'Kunde konnte nicht geladen werden',
+  'clients.editNamed': '{name} bearbeiten',
+  'clients.deleteNamed': '{name} löschen',
 
   // Documents
   'documents.title': 'Dokumente',
@@ -686,6 +688,8 @@ const en: Partial<Record<TKey, string>> = {
   'clients.noneCombobox': 'No clients found.',
   'clients.createNew': 'Create new client',
   'clients.clientLoadFailed': 'The client could not be loaded',
+  'clients.editNamed': 'Edit {name}',
+  'clients.deleteNamed': 'Delete {name}',
 
   'documents.title': 'Documents',
   'documents.description': 'Manage your quotes and invoices',

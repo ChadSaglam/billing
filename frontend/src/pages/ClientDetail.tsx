@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Mail, Phone, MapPin } from "lucide-react";
 import { getClient, updateClient, getDocuments } from "@/lib/api";
@@ -104,7 +104,11 @@ export default function ClientDetail() {
         <TableBody>
           {filtered.map((doc) => (
             <TableRow key={doc.id} className="cursor-pointer" onClick={() => navigate(`/documents/${doc.id}`)}>
-              <TableCell className="font-medium">{doc.document_number}</TableCell>
+              <TableCell className="font-medium">
+                <Link to={`/documents/${doc.id}`} className="hover:underline focus-visible:underline" onClick={(e) => e.stopPropagation()}>
+                  {doc.document_number}
+                </Link>
+              </TableCell>
               <TableCell>
                 <Badge variant="outline">{doc.document_type === "rechnung" ? t("common.rechnung") : t("common.offerte")}</Badge>
               </TableCell>

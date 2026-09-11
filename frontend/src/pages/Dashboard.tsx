@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   DollarSign, Clock, AlertTriangle, Users, Plus, FileText,
 } from 'lucide-react';
@@ -115,18 +115,19 @@ export default function Dashboard() {
         <>
           {/* Overdue Alert */}
           {data && data.overdue_count > 0 && (
-            <div
-              className="flex items-center gap-3 p-4 rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 p-4 rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => navigate('/documents?status=overdue')}
             >
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" aria-hidden="true" />
               <div>
                 <p className="font-medium text-red-800 dark:text-red-300">
                   {data.overdue_count === 1 ? t('dashboard.overdueOne') : t('dashboard.overdueMany', { count: data.overdue_count })}
                 </p>
                 <p className="text-sm text-red-600 dark:text-red-400">{t('dashboard.overdueHint')}</p>
               </div>
-            </div>
+            </button>
           )}
 
           {/* KPI Cards */}
@@ -135,7 +136,7 @@ export default function Dashboard() {
                 <Card key={stat.title}>
                   <CardContent className="p-4 flex items-center gap-3">
                     <div className={`p-2 rounded-lg ${stat.bg}`}>
-                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                      <stat.icon className={`h-5 w-5 ${stat.color}`} aria-hidden="true" />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">{stat.title}</p>
@@ -255,7 +256,11 @@ export default function Dashboard() {
                         className="cursor-pointer"
                         onClick={() => navigate(`/documents/${doc.id}`)}
                       >
-                        <TableCell className="font-medium">{doc.document_number}</TableCell>
+                        <TableCell className="font-medium">
+                          <Link to={`/documents/${doc.id}`} className="hover:underline focus-visible:underline" onClick={(e) => e.stopPropagation()}>
+                            {doc.document_number}
+                          </Link>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{doc.client?.company_name ?? '-'}</TableCell>
                         <TableCell className="text-muted-foreground">{formatDate(doc.date)}</TableCell>
                         <TableCell className="text-right font-medium tabular-nums">{formatCurrency(doc.total)}</TableCell>

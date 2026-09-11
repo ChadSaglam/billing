@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { X, ExternalLink, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,8 @@ function PreviewContent({ documentId, documentNumber, documentType, onClose }: O
 export default function PreviewPanel({
   documentId, documentNumber, documentType, open, onClose,
 }: PreviewPanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, open);
   return (
     <>
       <div
@@ -120,9 +123,11 @@ export default function PreviewPanel({
           open ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={onClose}
+        aria-hidden="true"
       />
 
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="preview-title"

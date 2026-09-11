@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, Search, Pencil, Trash2, Users } from "lucide-react";
 import { getClientsPage, createClient, updateClient, deleteClient } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
@@ -116,13 +116,13 @@ export default function Clients() {
         description={t("clients.description")}
         actions={
           <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" /> {t("clients.new")}
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" /> {t("clients.new")}
           </Button>
         }
       />
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <Input
           className="pl-10"
           placeholder={t("clients.searchPlaceholder")}
@@ -162,20 +162,25 @@ export default function Clients() {
                     onClick={() => navigate(`/clients/${client.id}`)}
                   >
                     <TableCell className="font-mono">{client.customer_number}</TableCell>
-                    <TableCell className="font-medium">{client.company_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link to={`/clients/${client.id}`} className="hover:underline focus-visible:underline" onClick={(e) => e.stopPropagation()}>
+                        {client.company_name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{client.contact_person || "—"}</TableCell>
                     <TableCell>{client.city}</TableCell>
                     <TableCell>{client.email || "—"}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={(e) => openEdit(client, e)}>
-                          <Pencil className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={(e) => openEdit(client, e)} aria-label={t("clients.editNamed", { name: client.company_name })}>
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
                         </Button>
                         <Button
                           variant="ghost" size="icon"
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(client.id); }}
+                          aria-label={t("clients.deleteNamed", { name: client.company_name })}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
                         </Button>
                       </div>
                     </TableCell>
@@ -195,7 +200,7 @@ export default function Clients() {
               >
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium truncate max-w-[70%]">{client.company_name}</span>
+                    <Link to={`/clients/${client.id}`} className="font-medium truncate max-w-[70%]" onClick={(e) => e.stopPropagation()}>{client.company_name}</Link>
                     <span className="text-xs text-muted-foreground font-mono">{client.customer_number}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -243,7 +248,7 @@ export default function Clients() {
           description={search ? t("clients.noneSearchDesc") : t("clients.noneDesc")}
           action={
             <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" /> {t("clients.new")}
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" /> {t("clients.new")}
             </Button>
           }
         />

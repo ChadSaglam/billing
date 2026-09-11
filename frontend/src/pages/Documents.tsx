@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, FileText, Mail, CheckCircle, Download, ArrowUpRight } from 'lucide-react';
 import { getDocumentsPage, bulkUpdateStatus, bulkSendEmail, bulkDownloadPdfZip } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
@@ -129,7 +129,7 @@ export default function Documents() {
             onClick={() => { setTab(tabItem.value); setSelected(new Set()); setPage(1); }}
             aria-pressed={tab === tabItem.value}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === tabItem.value ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              tab === tabItem.value ? 'bg-background shadow-sm' : 'text-foreground/70 hover:text-foreground'
             }`}
           >
             {t(tabItem.label)}
@@ -140,7 +140,7 @@ export default function Documents() {
       {/* Filters */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder={t('documents.searchPlaceholder')}
             aria-label={t('documents.searchPlaceholder')}
@@ -260,7 +260,9 @@ export default function Documents() {
                         />
                       </td>
                       <td className="p-3 font-medium" onClick={() => navigate(`/documents/${doc.id}`)}>
-                        {doc.document_number}
+                        <Link to={`/documents/${doc.id}`} className="hover:underline focus-visible:underline" onClick={(e) => e.stopPropagation()}>
+                          {doc.document_number}
+                        </Link>
                       </td>
                       <td className="p-3 text-muted-foreground" onClick={() => navigate(`/documents/${doc.id}`)}>
                         {doc.client?.company_name || t('documents.noClient')}
@@ -275,7 +277,7 @@ export default function Documents() {
                         <StatusBadge status={doc.status} />
                       </td>
                       <td className="p-3" onClick={() => navigate(`/documents/${doc.id}`)}>
-                        <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                        <ArrowUpRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       </td>
                     </tr>
                   ))}
@@ -295,7 +297,7 @@ export default function Documents() {
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{doc.document_number}</span>
+                      <Link to={`/documents/${doc.id}`} className="font-medium" onClick={(e) => e.stopPropagation()}>{doc.document_number}</Link>
                     </div>
                     <StatusBadge status={doc.status} />
                   </div>
