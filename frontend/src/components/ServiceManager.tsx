@@ -5,6 +5,7 @@ import { getServices, createService, updateService, deleteService } from '@/lib/
 import type { ServiceTemplate, CreateServicePayload } from '@/types';
 import { formatCurrency, toNum } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,6 +51,7 @@ interface ServiceManagerProps {
 
 export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceTemplate | null>(null);
   const [form, setForm] = useState<CreateServicePayload>(emptyService);
@@ -64,10 +66,10 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditDialogOpen(false);
-      toast({ title: 'Service created' });
+      toast({ title: t('services.created') });
     },
     onError: () => {
-      toast({ title: 'Failed to create service', variant: 'destructive' });
+      toast({ title: t('services.createFailed'), variant: 'destructive' });
     },
   });
 
@@ -77,10 +79,10 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setEditDialogOpen(false);
-      toast({ title: 'Service updated' });
+      toast({ title: t('services.updated') });
     },
     onError: () => {
-      toast({ title: 'Failed to update service', variant: 'destructive' });
+      toast({ title: t('services.updateFailed'), variant: 'destructive' });
     },
   });
 
@@ -88,10 +90,10 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
     mutationFn: deleteService,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      toast({ title: 'Service deleted' });
+      toast({ title: t('services.deleted') });
     },
     onError: () => {
-      toast({ title: 'Failed to delete service', variant: 'destructive' });
+      toast({ title: t('services.deleteFailed'), variant: 'destructive' });
     },
   });
 
@@ -129,7 +131,7 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
   };
 
   const handleDelete = (id: number) => {
-    if (window.confirm('Delete this service?')) {
+    if (window.confirm(t('services.deleteConfirm'))) {
       deleteMut.mutate(id);
     }
   };
@@ -145,16 +147,16 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Manage Services</DialogTitle>
+            <DialogTitle>{t('services.manage')}</DialogTitle>
             <DialogDescription>
-              Add, edit, or remove service templates used in documents.
+              {t('services.manageDesc')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex justify-end">
             <Button size="sm" onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Service
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t('services.add')}
             </Button>
           </div>
 
@@ -163,12 +165,12 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
+                    <TableHead>{t('services.name')}</TableHead>
+                    <TableHead>{t('services.category')}</TableHead>
+                    <TableHead>{t('services.unit')}</TableHead>
+                    <TableHead>{t('services.price')}</TableHead>
+                    <TableHead>{t('common.status')}</TableHead>
+                    <TableHead className="w-[100px]">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -179,21 +181,25 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
                       <TableCell>{svc.unit}</TableCell>
                       <TableCell className="font-mono">{formatCurrency(svc.default_price)}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={svc.is_active ? 'default' : 'secondary'}
-                          className="cursor-pointer"
+                        <button
+                          type="button"
                           onClick={() => handleToggleActive(svc)}
+                          aria-pressed={svc.is_active}
+                          aria-label={t('services.toggleActive', { name: svc.name })}
+                          className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          {svc.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                          <Badge variant={svc.is_active ? 'default' : 'secondary'} className="cursor-pointer">
+                            {svc.is_active ? t('services.active') : t('services.inactive')}
+                          </Badge>
+                        </button>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(svc)}>
-                            <Pencil className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(svc)} aria-label={t('services.editService', { name: svc.name })}>
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(svc.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(svc.id)} aria-label={t('services.deleteService', { name: svc.name })}>
+                            <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
                           </Button>
                         </div>
                       </TableCell>
@@ -204,7 +210,7 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground">
-              <p>No services yet. Add your first service template.</p>
+              <p>{t('services.none')}. {t('services.noneDesc')}</p>
             </div>
           )}
         </DialogContent>
@@ -213,15 +219,16 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingService ? 'Edit Service' : 'New Service'}</DialogTitle>
+            <DialogTitle>{editingService ? t('services.editTitle') : t('services.newTitle')}</DialogTitle>
             <DialogDescription>
-              {editingService ? 'Update the service details.' : 'Create a new service template.'}
+              {editingService ? t('services.editDesc') : t('services.newDesc')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label htmlFor="svc-name">{t('services.name')}</Label>
               <Input
+                id="svc-name"
                 value={form.name}
                 onChange={(e) => updateField('name', e.target.value)}
                 required
@@ -229,17 +236,18 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label htmlFor="svc-category">{t('services.category')}</Label>
                 <Input
+                  id="svc-category"
                   value={form.category}
                   onChange={(e) => updateField('category', e.target.value)}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label>Unit</Label>
+                <Label id="svc-unit-label">{t('services.unit')}</Label>
                 <Select value={form.unit} onValueChange={(v) => updateField('unit', v)}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-labelledby="svc-unit-label">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -252,16 +260,18 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label htmlFor="svc-description">{t('services.description')}</Label>
               <Input
+                id="svc-description"
                 value={form.description}
                 onChange={(e) => updateField('description', e.target.value)}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Default Price (CHF)</Label>
+                <Label htmlFor="svc-price">{t('services.defaultPrice')}</Label>
                 <Input
+                  id="svc-price"
                   type="number"
                   min={0}
                   step={0.01}
@@ -270,8 +280,9 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Sort Order</Label>
+                <Label htmlFor="svc-sort">{t('services.sortOrder')}</Label>
                 <Input
+                  id="svc-sort"
                   type="number"
                   min={0}
                   value={form.sort_order ?? 0}
@@ -281,10 +292,10 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving...' : editingService ? 'Update' : 'Create'}
+                {isSaving ? t('common.saving') : editingService ? t('common.update') : t('common.create')}
               </Button>
             </DialogFooter>
           </form>

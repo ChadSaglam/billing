@@ -4,6 +4,7 @@ import { Plus, Settings2 } from 'lucide-react';
 import { getServices } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { formatCurrency, toNum } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 import type { ServiceTemplate } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -24,6 +25,7 @@ interface LineItemsEditorProps {
 
 export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsEditorProps) {
   const [serviceManagerOpen, setServiceManagerOpen] = useState(false);
+  const { t } = useT();
 
   const { data: services } = useQuery({
     queryKey: queryKeys.services.all,
@@ -33,12 +35,12 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
   const servicesByCategory = useMemo(() => {
     if (!services) return {};
     return services.reduce<Record<string, ServiceTemplate[]>>((acc, svc) => {
-      const cat = svc.category || 'General';
+      const cat = svc.category || t('docForm.generalCategory');
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(svc);
       return acc;
     }, {});
-  }, [services]);
+  }, [services, t]);
 
   const { subtotal, discountAmount, vatByRate, total } = useMemo(
     () => calculateTotals(items, discountPercent),
@@ -81,11 +83,11 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-base">Line Items</CardTitle>
+          <CardTitle className="text-base">{t('docForm.lineItems')}</CardTitle>
           <div className="flex items-center gap-2">
             <Select onValueChange={(v) => v && addServiceAsLine(v)}>
-              <SelectTrigger className="w-[200px] h-8 text-xs">
-                <SelectValue placeholder="Add from catalog..." />
+              <SelectTrigger className="w-[200px] h-8 text-xs" aria-label={t('docForm.addFromCatalog')}>
+                <SelectValue placeholder={t('docForm.addFromCatalog')} />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(servicesByCategory).map(([category, svcs]) => (
@@ -104,22 +106,22 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" onClick={addLine}>
-              <Plus className="mr-1 h-3 w-3" />Line
+              <Plus className="mr-1 h-3 w-3" aria-hidden="true" />{t('docForm.line')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setServiceManagerOpen(true)}>
-              <Settings2 className="mr-1 h-3 w-3" />Services
+              <Settings2 className="mr-1 h-3 w-3" aria-hidden="true" />{t('docForm.services')}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {/* Table header */}
           <div className="grid grid-cols-[1fr_70px_100px_110px_80px_100px_40px] gap-2 text-xs font-medium text-muted-foreground px-1">
-            <span>Description</span>
-            <span>Qty</span>
-            <span>Unit</span>
-            <span>Price</span>
-            <span>MwSt</span>
-            <span className="text-right">Total</span>
+            <span>{t('docForm.description')}</span>
+            <span>{t('docForm.qty')}</span>
+            <span>{t('docForm.unit')}</span>
+            <span>{t('docForm.price')}</span>
+            <span>{t('common.vat')}</span>
+            <span className="text-right">{t('common.total')}</span>
             <span />
           </div>
 
@@ -140,24 +142,24 @@ export function LineItemsEditor({ items, onChange, discountPercent }: LineItemsE
           {/* Totals */}
           <div className="space-y-1.5 text-sm max-w-xs ml-auto">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-muted-foreground">{t('common.subtotal')}</span>
               <span className="font-mono">{formatCurrency(subtotal)}</span>
             </div>
             {discountPercent > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Discount ({discountPercent}%)</span>
+                <span>{t('common.discount')} ({discountPercent}%)</span>
                 <span className="font-mono">−{formatCurrency(discountAmount)}</span>
               </div>
             )}
             {vatByRate.map(([rate, amt]) => (
               <div key={rate} className="flex justify-between text-muted-foreground">
-                <span>MwSt {rate}%</span>
+                <span>{t('common.vat')} {rate}%</span>
                 <span className="font-mono">{formatCurrency(amt)}</span>
               </div>
             ))}
             <Separator />
             <div className="flex justify-between font-semibold">
-              <span>Total</span>
+              <span>{t('common.total')}</span>
               <span className="font-mono">{formatCurrency(total)}</span>
             </div>
           </div>

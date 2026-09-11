@@ -6,6 +6,7 @@ import { getClientsPage, createClient, updateClient, deleteClient } from "@/lib/
 import { queryKeys } from "@/lib/query-keys";
 import type { Client, CreateClientPayload } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -20,6 +21,7 @@ const PAGE_SIZE = 25;
 export default function Clients() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -42,7 +44,7 @@ export default function Clients() {
     onSuccess: () => {
       invalidateClients();
       setDialogOpen(false);
-      toast({ title: "Client created successfully" });
+      toast({ title: t("clients.created") });
     },
   });
 
@@ -52,9 +54,9 @@ export default function Clients() {
     onSuccess: () => {
       invalidateClients();
       setDialogOpen(false);
-      toast({ title: "Client updated successfully" });
+      toast({ title: t("clients.updated") });
     },
-    onError: () => toast({ title: "Failed to update client", variant: "destructive" }),
+    onError: () => toast({ title: t("clients.updateFailed"), variant: "destructive" }),
   });
 
   // No optimistic update here any more: the cache now holds a paginated
@@ -65,9 +67,9 @@ export default function Clients() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients.all });
       setDeleteTarget(null);
-      toast({ title: "Client deleted" });
+      toast({ title: t("clients.deleted") });
     },
-    onError: () => toast({ title: "Failed to delete client", variant: "destructive" }),
+    onError: () => toast({ title: t("clients.deleteFailed"), variant: "destructive" }),
   });
 
   const openCreate = () => {
@@ -110,11 +112,11 @@ export default function Clients() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Clients"
-        description="Manage your client database"
+        title={t("clients.title")}
+        description={t("clients.description")}
         actions={
           <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" /> New Client
+            <Plus className="mr-2 h-4 w-4" /> {t("clients.new")}
           </Button>
         }
       />
@@ -123,7 +125,8 @@ export default function Clients() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           className="pl-10"
-          placeholder="Search clients..."
+          placeholder={t("clients.searchPlaceholder")}
+          aria-label={t("clients.searchPlaceholder")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -141,12 +144,12 @@ export default function Clients() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer Nr</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>City</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
+                  <TableHead>{t("field.customerNumberShort")}</TableHead>
+                  <TableHead>{t("clients.company")}</TableHead>
+                  <TableHead>{t("clients.contact")}</TableHead>
+                  <TableHead>{t("field.city")}</TableHead>
+                  <TableHead>{t("field.email")}</TableHead>
+                  <TableHead className="w-24">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,8 +209,8 @@ export default function Clients() {
           {data && data.total > 0 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>
-                {data.total} {data.total === 1 ? "client" : "clients"} · page {data.page} of{" "}
-                {Math.max(1, Math.ceil(data.total / data.page_size))}
+                {data.total === 1 ? t("clients.countOne") : t("clients.countMany", { count: data.total })} ·{" "}
+                {t("common.pageOf", { page: data.page, pages: Math.max(1, Math.ceil(data.total / data.page_size)) })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -216,7 +219,7 @@ export default function Clients() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="outline"
@@ -224,7 +227,7 @@ export default function Clients() {
                   disabled={page * data.page_size >= data.total}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -234,11 +237,11 @@ export default function Clients() {
         <EmptyState
           preset="clients"
           icon={Users}
-          title="No clients found"
-          description="Add your first client to get started"
+          title={search ? t("clients.noneSearch", { search }) : t("clients.none")}
+          description={search ? t("clients.noneSearchDesc") : t("clients.noneDesc")}
           action={
             <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" /> New Client
+              <Plus className="mr-2 h-4 w-4" /> {t("clients.new")}
             </Button>
           }
         />
@@ -257,9 +260,9 @@ export default function Clients() {
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete Client"
-        description="This will permanently delete this client and cannot be undone."
-        confirmLabel="Delete"
+        title={t("clients.deleteTitle")}
+        description={t("clients.deleteDesc")}
+        confirmLabel={t("common.delete")}
         isPending={deleteMutation.isPending}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
       />

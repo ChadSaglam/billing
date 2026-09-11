@@ -3,6 +3,7 @@ import { X, ExternalLink, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { downloadDocumentPdf, fetchDocumentPreviewUrl } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 interface PreviewPanelProps {
   documentId: number;
@@ -13,6 +14,7 @@ interface PreviewPanelProps {
 }
 
 function PreviewContent({ documentId, documentNumber, documentType, onClose }: Omit<PreviewPanelProps, 'open'>) {
+  const { t } = useT();
   // One state object, set once per resolution — avoids the cascading
   // setState-in-effect pattern eslint flags.
   const [preview, setPreview] = useState<
@@ -55,40 +57,42 @@ function PreviewContent({ documentId, documentNumber, documentType, onClose }: O
   return (
     <>
       <div className="flex items-center justify-between px-4 h-14 border-b">
-        <h2 className="text-sm font-medium">Preview {documentNumber}</h2>
+        <h2 id="preview-title" className="text-sm font-medium">{t("preview.title", { number: documentNumber })}</h2>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost" size="icon" className="h-8 w-8"
             onClick={() => downloadDocumentPdf(documentId, documentNumber, documentType)}
-            title="Download PDF"
+            title={t("preview.download")}
+            aria-label={t("preview.download")}
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-4 w-4" aria-hidden="true" />
           </Button>
           <Button
             variant="ghost" size="icon" className="h-8 w-8"
             onClick={() => previewUrl && window.open(previewUrl, "_blank")}
             disabled={!previewUrl}
-            title="Open in new tab"
+            title={t("preview.openTab")}
+            aria-label={t("preview.openTab")}
           >
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-            <X className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose} aria-label={t("preview.close")}>
+            <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </div>
 
       {preview.status === "error" && (
         <div className="flex items-center justify-center h-[calc(100%-3.5rem)]">
-          <p className="text-sm text-destructive">Vorschau konnte nicht geladen werden</p>
+          <p role="alert" className="text-sm text-destructive">{t("preview.failed")}</p>
         </div>
       )}
 
       {preview.status !== "error" && !iframeLoaded && (
         <div className="flex items-center justify-center h-[calc(100%-3.5rem)]">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-muted-foreground">Generating PDF…</p>
+            <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+            <p role="status" className="text-sm text-muted-foreground">{t("preview.generating")}</p>
           </div>
         </div>
       )}
@@ -98,7 +102,7 @@ function PreviewContent({ documentId, documentNumber, documentType, onClose }: O
         src={previewUrl}
         className={cn("w-full h-[calc(100%-3.5rem)]", !iframeLoaded && "hidden")}
         onLoad={() => setIframeLoaded(true)}
-        title={`Preview ${documentNumber}`}
+        title={t("preview.title", { number: documentNumber })}
       />
       )}
     </>
@@ -119,6 +123,10 @@ export default function PreviewPanel({
       />
 
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="preview-title"
+        aria-hidden={!open}
         className={cn(
           "fixed top-0 right-0 z-50 h-full w-full max-w-2xl bg-background border-l shadow-lg transition-transform duration-300 ease-out",
           open ? "translate-x-0" : "translate-x-full"

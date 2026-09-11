@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n';
 
 interface PageHeaderProps {
   title: string;
@@ -13,13 +14,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, backButton, actions, badge }: PageHeaderProps) {
   const navigate = useNavigate();
+  const { t } = useT();
 
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
       <div className="flex items-center gap-4">
         {backButton && (
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label={t('common.back')}>
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Button>
         )}
         <div>

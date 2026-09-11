@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { getClients, getDocuments } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { useT, statusLabel } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -17,6 +18,7 @@ interface Props {
 export default function CommandPalette({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t, locale } = useT();
   const [search, setSearch] = useState("");
 
   const { data: clients } = useQuery({
@@ -66,7 +68,7 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
 
   // Detect dark mode
   const isDark = document.documentElement.classList.contains("dark");
-  const t = {
+  const theme = {
     bg: isDark ? "#1a1a1a" : "#ffffff",
     fg: isDark ? "#fafafa" : "#0a0a0a",
     border: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
@@ -100,28 +102,28 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
         }
         .cmd-box {
           width: 100%; max-width: 540px;
-          background: ${t.bg}; color: ${t.fg};
-          border-radius: 14px; border: 1px solid ${t.border};
-          box-shadow: ${t.shadow};
+          background: ${theme.bg}; color: ${theme.fg};
+          border-radius: 14px; border: 1px solid ${theme.border};
+          box-shadow: ${theme.shadow};
           overflow: hidden;
           animation: cmdSlide 180ms cubic-bezier(0.16,1,0.3,1);
         }
         .cmd-search {
           display: flex; align-items: center; gap: 12px;
-          padding: 0 18px; border-bottom: 1px solid ${t.border};
+          padding: 0 18px; border-bottom: 1px solid ${theme.border};
         }
-        .cmd-search svg { width: 16px; height: 16px; color: ${t.muted}; flex-shrink: 0; }
+        .cmd-search svg { width: 16px; height: 16px; color: ${theme.muted}; flex-shrink: 0; }
         .cmd-search input {
           flex: 1; height: 50px; border: none; outline: none;
-          background: transparent; font-size: 14px; color: ${t.fg};
+          background: transparent; font-size: 14px; color: ${theme.fg};
           font-family: inherit;
         }
-        .cmd-search input::placeholder { color: ${t.muted}; }
+        .cmd-search input::placeholder { color: ${theme.muted}; }
         .cmd-esc {
           font-family: ui-monospace, monospace; font-size: 10px;
           padding: 3px 7px; border-radius: 5px;
-          background: ${t.kbdBg}; border: 1px solid ${t.kbdBorder};
-          color: ${t.muted}; font-weight: 500;
+          background: ${theme.kbdBg}; border: 1px solid ${theme.kbdBorder};
+          color: ${theme.muted}; font-weight: 500;
         }
         [cmdk-list] {
           max-height: 320px; overflow-y: auto; overscroll-behavior: contain;
@@ -135,22 +137,22 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
         [cmdk-group] { padding-bottom: 2px; }
         [cmdk-group-heading] {
           font-size: 10px; font-weight: 600; text-transform: uppercase;
-          letter-spacing: 0.06em; color: ${t.muted};
+          letter-spacing: 0.06em; color: ${theme.muted};
           padding: 10px 10px 6px; user-select: none;
         }
         [cmdk-item] {
           display: flex; align-items: center; gap: 10px;
           padding: 8px 10px; border-radius: 8px; cursor: pointer;
           font-size: 13px; transition: all 60ms ease;
-          color: ${t.fg};
+          color: ${theme.fg};
         }
         [cmdk-item][data-selected="true"] {
-          background: ${t.selected}; color: ${t.selectedFg};
+          background: ${theme.selected}; color: ${theme.selectedFg};
         }
-        [cmdk-item][data-selected="true"] .ci-sub { color: ${t.selectedMuted}; }
+        [cmdk-item][data-selected="true"] .ci-sub { color: ${theme.selectedMuted}; }
         [cmdk-item][data-selected="true"] .ci-icon {
           background: rgba(255,255,255,0.15) !important;
-          color: ${t.selectedFg} !important;
+          color: ${theme.selectedFg} !important;
         }
         [cmdk-item][data-selected="true"] .ci-badge { opacity: 0.85; }
         .ci-icon {
@@ -160,25 +162,25 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
         }
         .ci-icon svg { width: 15px; height: 15px; }
         .ci-label { font-weight: 500; line-height: 1.3; }
-        .ci-sub { font-size: 11px; color: ${t.muted}; line-height: 1.3; transition: color 60ms ease; }
+        .ci-sub { font-size: 11px; color: ${theme.muted}; line-height: 1.3; transition: color 60ms ease; }
         .ci-badge {
           font-size: 10px; font-weight: 600; padding: 2px 7px;
           border-radius: 99px; text-transform: capitalize; flex-shrink: 0;
         }
         .cmd-footer {
           display: flex; align-items: center; gap: 14px;
-          padding: 8px 18px; border-top: 1px solid ${t.border};
-          font-size: 10px; color: ${t.muted}; user-select: none;
+          padding: 8px 18px; border-top: 1px solid ${theme.border};
+          font-size: 10px; color: ${theme.muted}; user-select: none;
         }
         .cmd-footer span { display: flex; align-items: center; gap: 4px; }
         .cmd-footer kbd {
           font-family: ui-monospace, monospace; font-size: 9px;
           padding: 1px 4px; border-radius: 3px;
-          background: ${t.kbdBg}; border: 1px solid ${t.kbdBorder};
+          background: ${theme.kbdBg}; border: 1px solid ${theme.kbdBorder};
         }
         [cmdk-empty] {
           display: flex; flex-direction: column; align-items: center;
-          padding: 36px 0; color: ${t.muted};
+          padding: 36px 0; color: ${theme.muted};
         }
         [cmdk-empty] svg { width: 36px; height: 36px; opacity: 0.25; margin-bottom: 10px; }
         @keyframes cmdIn { from { opacity: 0 } to { opacity: 1 } }
@@ -199,7 +201,8 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
                   ref={inputRef}
                   value={search}
                   onValueChange={setSearch}
-                  placeholder="Search commands, clients, documents..."
+                  placeholder={t("cmd.placeholder")}
+                  aria-label={t("cmd.placeholder")}
                 />
                 <span className="cmd-esc">ESC</span>
               </div>
@@ -207,27 +210,27 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
               <Command.List>
                 <Command.Empty>
                   <Search />
-                  <span style={{ fontWeight: 500, fontSize: 13 }}>No results found</span>
-                  <span style={{ fontSize: 11, marginTop: 4, opacity: 0.6 }}>Try a different search term</span>
+                  <span style={{ fontWeight: 500, fontSize: 13 }}>{t("cmd.noResults")}</span>
+                  <span style={{ fontSize: 11, marginTop: 4, opacity: 0.6 }}>{t("cmd.tryOther")}</span>
                 </Command.Empty>
 
-                <Command.Group heading="Quick Actions">
+                <Command.Group heading={t("cmd.quickActions")}>
                   <Command.Item onSelect={() => go("/documents/new?type=offerte")}>
                     <div className="ci-icon" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6" }}><Plus /></div>
-                    <div><div className="ci-label">New Offerte</div><div className="ci-sub">Create a new quote</div></div>
+                    <div><div className="ci-label">{t("common.newOfferte")}</div><div className="ci-sub">{t("cmd.createQuote")}</div></div>
                   </Command.Item>
                   <Command.Item onSelect={() => go("/documents/new?type=rechnung")}>
                     <div className="ci-icon" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}><Plus /></div>
-                    <div><div className="ci-label">New Rechnung</div><div className="ci-sub">Create a new invoice</div></div>
+                    <div><div className="ci-label">{t("common.newRechnung")}</div><div className="ci-sub">{t("cmd.createInvoice")}</div></div>
                   </Command.Item>
                 </Command.Group>
 
-                <Command.Group heading="Navigation">
+                <Command.Group heading={t("cmd.navigation")}>
                   {[
-                    { path: "/", label: "Dashboard", desc: "Overview & stats", icon: LayoutDashboard, bg: "rgba(139,92,246,0.1)", fg: "#8b5cf6" },
-                    { path: "/documents", label: "Documents", desc: "Invoices & quotes", icon: FileText, bg: "rgba(249,115,22,0.1)", fg: "#f97316" },
-                    { path: "/clients", label: "Clients", desc: "Client database", icon: Users, bg: "rgba(6,182,212,0.1)", fg: "#06b6d4" },
-                    { path: "/settings", label: "Settings", desc: "Company & preferences", icon: Settings, bg: "rgba(107,114,128,0.1)", fg: "#6b7280" },
+                    { path: "/", label: t("nav.dashboard"), desc: t("cmd.dashboardDesc"), icon: LayoutDashboard, bg: "rgba(139,92,246,0.1)", fg: "#8b5cf6" },
+                    { path: "/documents", label: t("nav.documents"), desc: t("cmd.documentsDesc"), icon: FileText, bg: "rgba(249,115,22,0.1)", fg: "#f97316" },
+                    { path: "/clients", label: t("nav.clients"), desc: t("cmd.clientsDesc"), icon: Users, bg: "rgba(6,182,212,0.1)", fg: "#06b6d4" },
+                    { path: "/settings", label: t("nav.settings"), desc: t("cmd.settingsDesc"), icon: Settings, bg: "rgba(107,114,128,0.1)", fg: "#6b7280" },
                   ].map((item) => (
                     <Command.Item key={item.path} onSelect={() => go(item.path)} value={item.label}>
                       <div className="ci-icon" style={{ background: item.bg, color: item.fg }}><item.icon /></div>
@@ -237,7 +240,7 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
                 </Command.Group>
 
                 {clients && clients.length > 0 && (
-                  <Command.Group heading="Clients">
+                  <Command.Group heading={t("cmd.clients")}>
                     {clients.slice(0, 5).map((c) => (
                       <Command.Item key={c.id} onSelect={() => go(`/clients/${c.id}`)} value={`${c.company_name} ${c.customer_number}`}>
                         <div className="ci-icon" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1", fontWeight: 700, fontSize: 13 }}>
@@ -250,7 +253,7 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
                 )}
 
                 {documents && documents.length > 0 && (
-                  <Command.Group heading="Recent Documents">
+                  <Command.Group heading={t("cmd.recentDocuments")}>
                     {documents.slice(0, 5).map((d) => {
                       const isOff = d.document_type === "offerte";
                       const sc: Record<string, { bg: string; fg: string }> = {
@@ -265,8 +268,8 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
                       return (
                         <Command.Item key={d.id} onSelect={() => go(`/documents/${d.id}`)} value={`${d.document_number} ${d.client?.company_name}`}>
                           <div className="ci-icon" style={{ background: isOff ? "rgba(59,130,246,0.1)" : "rgba(34,197,94,0.1)", color: isOff ? "#3b82f6" : "#22c55e" }}><Hash /></div>
-                          <div style={{ flex: 1 }}><div className="ci-label">{d.document_number}</div><div className="ci-sub">{d.client?.company_name} · <span style={{ textTransform: "capitalize" }}>{d.document_type}</span></div></div>
-                          <div className="ci-badge" style={{ background: s.bg, color: s.fg }}>{d.status}</div>
+                          <div style={{ flex: 1 }}><div className="ci-label">{d.document_number}</div><div className="ci-sub">{d.client?.company_name} · <span>{isOff ? t("common.offerte") : t("common.rechnung")}</span></div></div>
+                          <div className="ci-badge" style={{ background: s.bg, color: s.fg }}>{statusLabel(d.status, locale)}</div>
                         </Command.Item>
                       );
                     })}
@@ -275,9 +278,9 @@ export default function CommandPalette({ open, onOpenChange }: Props) {
               </Command.List>
 
               <div className="cmd-footer">
-                <span><kbd>↑↓</kbd> Navigate</span>
-                <span><kbd>↵</kbd> Open</span>
-                <span><kbd>Esc</kbd> Close</span>
+                <span><kbd>↑↓</kbd> {t("cmd.navigate")}</span>
+                <span><kbd>↵</kbd> {t("cmd.select")}</span>
+                <span><kbd>Esc</kbd> {t("cmd.close")}</span>
               </div>
             </Command>
           </div>

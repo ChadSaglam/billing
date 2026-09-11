@@ -5,6 +5,8 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
  * onboarding, create a client, create a two-line invoice and open the PDF
  * preview. Every run registers a fresh tenant, so it needs no seed data
  * and leaves nothing that a later run could collide with.
+ *
+ * The UI defaults to German (R-25), so every label below is the DE text.
  */
 
 const API_URL = process.env.E2E_API_URL || 'http://localhost:9100';
@@ -18,7 +20,7 @@ const tenant = {
 };
 const clientName = `Kunde ${run} AG`;
 
-/** `FormField` renders `<label>` followed by `<input>` without `htmlFor`. */
+/** `FormField` renders `<label>` followed by `<input>` (siblings). */
 function fieldByLabel(scope: Page | Locator, label: string) {
   return scope.locator(`label:text-is("${label}") + input, label:has-text("${label}") + input`).first();
 }
@@ -28,63 +30,63 @@ test.describe.configure({ mode: 'serial' });
 test('register → onboarding → client → invoice with 2 lines → PDF preview', async ({ page }) => {
   // ── Register a tenant through the UI ──
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Register' }).click();
+  await page.getByRole('button', { name: 'Registrieren' }).click();
   await page.locator('#full_name').fill(tenant.fullName);
   await page.locator('#company_name').fill(tenant.companyName);
   await page.locator('#email').fill(tenant.email);
   await page.locator('#password').fill(tenant.password);
-  await page.getByRole('button', { name: 'Create Account' }).click();
+  await page.getByRole('button', { name: 'Konto erstellen' }).click();
 
   // A fresh tenant is sent to onboarding first.
   await page.waitForURL('**/onboarding', { timeout: 15_000 });
-  await fieldByLabel(page, 'Company Name').fill(tenant.companyName);
-  await fieldByLabel(page, 'Street').fill('Bahnhofstrasse 1');
+  await fieldByLabel(page, 'Firmenname').fill(tenant.companyName);
+  await fieldByLabel(page, 'Strasse').fill('Bahnhofstrasse 1');
   await fieldByLabel(page, 'PLZ').fill('8001');
-  await fieldByLabel(page, 'City').fill('Zürich');
+  await fieldByLabel(page, 'Ort').fill('Zürich');
   await fieldByLabel(page, 'IBAN').fill('CH93 0076 2011 6238 5295 7');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Skip for now' }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await page.getByRole('button', { name: 'Go to Dashboard' }).click();
+  await page.getByRole('button', { name: 'Weiter' }).click();
+  await page.getByRole('button', { name: 'Vorerst überspringen' }).click();
+  await page.getByRole('button', { name: 'Überspringen', exact: true }).click();
+  await page.getByRole('button', { name: 'Zum Dashboard' }).click();
   await page.waitForURL(/\/$/, { timeout: 15_000 });
-  await expect(page.getByText('Total Revenue')).toBeVisible();
+  await expect(page.getByText('Umsatz total')).toBeVisible();
 
   // ── Create a client ──
   await page.goto('/clients');
-  await page.getByRole('button', { name: 'New Client' }).first().click();
+  await page.getByRole('button', { name: 'Neuer Kunde' }).first().click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await fieldByLabel(dialog, 'Customer Number').fill(`K-${run}`);
-  await fieldByLabel(dialog, 'Company Name').fill(clientName);
-  await fieldByLabel(dialog, 'Street').fill('Teststrasse 1');
-  await fieldByLabel(dialog, 'Postal Code').fill('8000');
-  await fieldByLabel(dialog, 'City').fill('Zürich');
-  await dialog.getByRole('button', { name: 'Create Client' }).click();
+  await fieldByLabel(dialog, 'Kundennummer').fill(`K-${run}`);
+  await fieldByLabel(dialog, 'Firmenname').fill(clientName);
+  await fieldByLabel(dialog, 'Strasse').fill('Teststrasse 1');
+  await fieldByLabel(dialog, 'PLZ').fill('8000');
+  await fieldByLabel(dialog, 'Ort').fill('Zürich');
+  await dialog.getByRole('button', { name: 'Kunde erstellen' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(clientName).first()).toBeVisible();
 
   // ── Create an invoice with two lines ──
   await page.goto('/documents/new?type=rechnung');
   await page.getByRole('combobox').first().click();
-  await page.getByPlaceholder('Search clients...').fill(clientName);
+  await page.getByPlaceholder('Kunden suchen…').fill(clientName);
   await page.getByRole('option', { name: new RegExp(clientName) }).click();
 
   // Each line is a grid row: description, quantity, unit, unit price, VAT, total.
-  const lineRow = (i: number) => page.getByPlaceholder('Description').nth(i).locator('..');
+  const lineRow = (i: number) => page.getByPlaceholder('Beschreibung').nth(i).locator('..');
   const fillLine = async (i: number, description: string, qty: string, price: string) => {
-    await lineRow(i).getByPlaceholder('Description').fill(description);
+    await lineRow(i).getByPlaceholder('Beschreibung').fill(description);
     await lineRow(i).locator('input[type="number"]').nth(0).fill(qty);
     await lineRow(i).locator('input[type="number"]').nth(1).fill(price);
   };
 
   await fillLine(0, 'Beratung', '2', '100');
-  await page.getByRole('button', { name: 'Line' }).click();
+  await page.getByRole('button', { name: 'Position', exact: true }).click();
   await fillLine(1, 'Reisezeit', '1', '50');
 
   // 250 net + 8.1 % VAT = 270.25 — the editor previews the server's math.
   await expect(page.getByText('CHF 270.25').first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Save Draft' }).click();
+  await page.getByRole('button', { name: 'Entwurf speichern' }).click();
   await page.waitForURL(/\/documents\/\d+$/, { timeout: 15_000 });
   const docId = Number(page.url().match(/\/documents\/(\d+)$/)![1]);
 

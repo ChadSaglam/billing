@@ -4,6 +4,7 @@ import { getTeamUsers, inviteUser, updateUser, removeUser, getMe } from '@/lib/a
 import type { InviteUserPayload } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { getApiErrorMessage } from '@/lib/errors';
+import { useT, type TKey } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -17,16 +18,17 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 
-const ROLE_META: Record<string, { label: string; icon: typeof Shield; color: string }> = {
-  admin: { label: 'Admin', icon: Shield, color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
-  editor: { label: 'Editor', icon: Pencil, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
-  viewer: { label: 'Viewer', icon: Eye, color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' },
+const ROLE_META: Record<string, { label: TKey; icon: typeof Shield; color: string }> = {
+  admin: { label: 'team.admin', icon: Shield, color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
+  editor: { label: 'team.editor', icon: Pencil, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+  viewer: { label: 'team.viewer', icon: Eye, color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' },
 };
 
 const EMPTY_INVITE: InviteUserPayload = { email: '', full_name: '', role: 'editor' };
 
 export function TeamTab() {
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [form, setForm] = useState<InviteUserPayload>(EMPTY_INVITE);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
@@ -43,12 +45,12 @@ export function TeamTab() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['team'] });
       setTempPassword(res.temp_password);
-      toast({ title: `${res.full_name} invited` });
+      toast({ title: t('team.invited', { name: res.full_name }) });
     },
     onError: (err: unknown) => {
       toast({
-        title: 'Invite failed',
-        description: getApiErrorMessage(err, 'Unknown error'),
+        title: t('team.inviteFailed'),
+        description: getApiErrorMessage(err, t('team.unknownError')),
         variant: 'destructive',
       });
     },
@@ -59,10 +61,10 @@ export function TeamTab() {
       updateUser(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team'] });
-      toast({ title: 'User updated' });
+      toast({ title: t('team.userUpdated') });
     },
     onError: (err: unknown) => {
-      toast({ title: getApiErrorMessage(err, 'Update failed'), variant: 'destructive' });
+      toast({ title: getApiErrorMessage(err, t('team.updateFailed')), variant: 'destructive' });
     },
   });
 
@@ -71,7 +73,7 @@ export function TeamTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team'] });
       setDeleteTarget(null);
-      toast({ title: 'User removed' });
+      toast({ title: t('team.userRemoved') });
     },
   });
 
@@ -86,12 +88,12 @@ export function TeamTab() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Team Members</CardTitle>
-          <CardDescription>Manage who has access to your billing account</CardDescription>
+          <CardTitle>{t('team.title')}</CardTitle>
+          <CardDescription>{t('team.desc')}</CardDescription>
         </div>
         {isAdmin && (
           <Button onClick={() => { setForm(EMPTY_INVITE); setTempPassword(null); setInviteOpen(true); }}>
-            <UserPlus className="mr-2 h-4 w-4" /> Invite User
+            <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" /> {t('team.invite')}
           </Button>
         )}
       </CardHeader>
@@ -121,7 +123,7 @@ export function TeamTab() {
                     </div>
                     <div className="min-w-0">
                       <div className="font-medium truncate">
-                        {user.full_name} {isSelf && <span className="text-muted-foreground text-xs">(you)</span>}
+                        {user.full_name} {isSelf && <span className="text-muted-foreground text-xs">{t('team.you')}</span>}
                       </div>
                       <div className="text-sm text-muted-foreground truncate">{user.email}</div>
                     </div>
@@ -132,18 +134,18 @@ export function TeamTab() {
                         value={user.role}
                         onValueChange={(role) => updateMutation.mutate({ id: user.id, role })}
                       >
-                        <SelectTrigger className="w-28 h-8">
+                        <SelectTrigger className="w-28 h-8" aria-label={t('team.roleFor', { name: user.full_name })}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="editor">Editor</SelectItem>
-                          <SelectItem value="viewer">Viewer</SelectItem>
+                          <SelectItem value="admin">{t('team.admin')}</SelectItem>
+                          <SelectItem value="editor">{t('team.editor')}</SelectItem>
+                          <SelectItem value="viewer">{t('team.viewer')}</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
                       <Badge variant="secondary" className={meta.color}>
-                        <RoleIcon className="mr-1 h-3 w-3" /> {meta.label}
+                        <RoleIcon className="mr-1 h-3 w-3" aria-hidden="true" /> {t(meta.label)}
                       </Badge>
                     )}
                     {isAdmin && !isSelf && (
@@ -151,8 +153,9 @@ export function TeamTab() {
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeleteTarget(user.id)}
+                        aria-label={t('team.removeUserNamed', { name: user.full_name })}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
                       </Button>
                     )}
                   </div>
@@ -166,48 +169,51 @@ export function TeamTab() {
       <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setTempPassword(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{tempPassword ? 'User Invited!' : 'Invite Team Member'}</DialogTitle>
+            <DialogTitle>{tempPassword ? t('team.userInvited') : t('team.inviteMember')}</DialogTitle>
           </DialogHeader>
 
           {tempPassword ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Share these credentials with <strong>{form.full_name}</strong>. The temporary password cannot be shown again.
+                {t('team.shareCredentials', { name: form.full_name })}
               </p>
               <div className="rounded-lg bg-muted p-4 space-y-2 font-mono text-sm">
-                <div>Email: <strong>{form.email}</strong></div>
+                <div>{t('field.email')}: <strong>{form.email}</strong></div>
                 <div className="flex items-center gap-2">
-                  Password: <strong>{tempPassword}</strong>
+                  {t('auth.password')}: <strong>{tempPassword}</strong>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6"
                     onClick={() => {
                       navigator.clipboard.writeText(tempPassword);
-                      toast({ title: 'Password copied' });
+                      toast({ title: t('team.passwordCopied') });
                     }}
+                    aria-label={t('team.copyPassword')}
                   >
-                    <Copy className="h-3 w-3" />
+                    <Copy className="h-3 w-3" aria-hidden="true" />
                   </Button>
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={() => { setInviteOpen(false); setTempPassword(null); }}>Done</Button>
+                <Button onClick={() => { setInviteOpen(false); setTempPassword(null); }}>{t('common.done')}</Button>
               </DialogFooter>
             </div>
           ) : (
             <form onSubmit={handleInviteSubmit} className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Full Name</label>
+                <label htmlFor="invite-full-name" className="text-sm font-medium">{t('auth.fullName')}</label>
                 <Input
+                  id="invite-full-name"
                   value={form.full_name}
                   onChange={(e) => setForm((p) => ({ ...p, full_name: e.target.value }))}
                   required
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Email</label>
+                <label htmlFor="invite-email" className="text-sm font-medium">{t('field.email')}</label>
                 <Input
+                  id="invite-email"
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
@@ -215,22 +221,22 @@ export function TeamTab() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Role</label>
+                <label id="invite-role-label" className="text-sm font-medium">{t('team.role')}</label>
                 <Select value={form.role} onValueChange={(v) => setForm((p) => ({ ...p, role: v }))}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-labelledby="invite-role-label">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin — full access</SelectItem>
-                    <SelectItem value="editor">Editor — create & edit documents</SelectItem>
-                    <SelectItem value="viewer">Viewer — read-only access</SelectItem>
+                    <SelectItem value="admin">{t('team.adminDesc')}</SelectItem>
+                    <SelectItem value="editor">{t('team.editorDesc')}</SelectItem>
+                    <SelectItem value="viewer">{t('team.viewerDesc')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>{t('common.cancel')}</Button>
                 <Button type="submit" disabled={inviteMutation.isPending}>
-                  {inviteMutation.isPending ? 'Inviting...' : 'Send Invite'}
+                  {inviteMutation.isPending ? t('team.inviting') : t('team.sendInvite')}
                 </Button>
               </DialogFooter>
             </form>
@@ -241,9 +247,9 @@ export function TeamTab() {
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
-        title="Remove User"
-        description="This user will lose access immediately. This cannot be undone."
-        confirmLabel="Remove"
+        title={t('team.removeUser')}
+        description={t('team.removeDesc')}
+        confirmLabel={t('team.remove')}
         isPending={deleteMutation.isPending}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
       />

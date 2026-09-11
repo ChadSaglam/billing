@@ -7,9 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { login, register } from '@/lib/api';
 import { setToken } from '@/lib/auth';
 import { getApiErrorMessage } from '@/lib/errors';
+import { useT } from '@/lib/i18n';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { t } = useT();
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,19 +41,19 @@ export default function Login() {
       setToken(result.access_token);
       navigate('/');
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Something went wrong'));
+      setError(getApiErrorMessage(err, t('auth.genericError')));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 gap-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">🧾 ChaDev Billing</CardTitle>
+          <CardTitle className="text-2xl">🧾 {t('common.appName')}</CardTitle>
           <CardDescription>
-            {isRegister ? 'Create your account' : 'Sign in to your account'}
+            {isRegister ? t('auth.createAccountDesc') : t('auth.signInDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -58,7 +61,7 @@ export default function Login() {
             {isRegister && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
+                  <Label htmlFor="full_name">{t('auth.fullName')}</Label>
                   <Input
                     id="full_name"
                     value={form.full_name}
@@ -67,7 +70,7 @@ export default function Login() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="company_name">Company Name</Label>
+                  <Label htmlFor="company_name">{t('auth.companyName')}</Label>
                   <Input
                     id="company_name"
                     value={form.company_name}
@@ -79,7 +82,7 @@ export default function Login() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('auth.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -90,7 +93,7 @@ export default function Login() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -100,14 +103,14 @@ export default function Login() {
               />
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Please wait…' : isRegister ? 'Create Account' : 'Sign In'}
+              {loading ? t('auth.pleaseWait') : isRegister ? t('auth.createAccount') : t('auth.signIn')}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
-              {isRegister ? 'Already have an account?' : "Don't have an account?"}{' '}
+              {isRegister ? t('auth.haveAccount') : t('auth.noAccount')}{' '}
               <button
                 type="button"
                 className="text-primary underline"
@@ -116,12 +119,13 @@ export default function Login() {
                   setError('');
                 }}
               >
-                {isRegister ? 'Sign in' : 'Register'}
+                {isRegister ? t('auth.signIn') : t('auth.register')}
               </button>
             </p>
           </form>
         </CardContent>
       </Card>
+      <LanguageSwitcher />
     </div>
   );
 }

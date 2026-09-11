@@ -15,6 +15,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { formatCurrency, formatDate, toNum } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { getApiErrorMessage } from '@/lib/errors';
+import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,7 @@ export default function DocumentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -56,8 +58,8 @@ export default function DocumentDetail() {
 
   const statusMutation = useMutation({
     mutationFn: (status: string) => updateDocumentStatus(Number(id), status),
-    onSuccess: () => { invalidate(); toast({ title: 'Status updated' }); },
-    onError: () => toast({ title: 'Failed to update status', variant: 'destructive' }),
+    onSuccess: () => { invalidate(); toast({ title: t('docDetail.statusUpdated') }); },
+    onError: () => toast({ title: t('docDetail.statusFailed'), variant: 'destructive' }),
   });
 
   const paymentMutation = useMutation({
@@ -69,40 +71,40 @@ export default function DocumentDetail() {
     }),
     onSuccess: () => {
       invalidate();
-      toast({ title: 'Marked as paid' });
+      toast({ title: t('docDetail.markedPaid') });
       setPaymentOpen(false);
     },
-    onError: () => toast({ title: 'Failed to mark as paid', variant: 'destructive' }),
+    onError: () => toast({ title: t('docDetail.markPaidFailed'), variant: 'destructive' }),
   });
 
   const convertMutation = useMutation({
     mutationFn: () => convertDocument(Number(id)),
     onSuccess: (newDoc) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-      toast({ title: 'Converted to Rechnung' });
+      toast({ title: t('docDetail.converted') });
       navigate(`/documents/${newDoc.id}`);
     },
-    onError: () => toast({ title: 'Failed to convert', variant: 'destructive' }),
+    onError: () => toast({ title: t('docDetail.convertFailed'), variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteDocument(Number(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-      toast({ title: 'Document deleted' });
+      toast({ title: t('docDetail.deleted') });
       navigate('/documents');
     },
-    onError: () => toast({ title: 'Failed to delete', variant: 'destructive' }),
+    onError: () => toast({ title: t('docDetail.deleteFailed'), variant: 'destructive' }),
   });
 
   const emailMutation = useMutation({
     mutationFn: () => sendDocumentEmail(Number(id)),
     onSuccess: (data) => {
       invalidate();
-      toast({ title: `Email sent to ${data.recipient}` });
+      toast({ title: t('docDetail.emailSent', { recipient: data.recipient }) });
     },
     onError: (err: unknown) => {
-      toast({ title: getApiErrorMessage(err, 'Failed to send email'), variant: 'destructive' });
+      toast({ title: getApiErrorMessage(err, t('docDetail.emailFailed')), variant: 'destructive' });
     },
   });
 
@@ -110,7 +112,7 @@ export default function DocumentDetail() {
     mutationFn: () => generatePortalToken(Number(id)),
     onSuccess: () => {
       invalidate();
-      toast({ title: 'Portal link generated' });
+      toast({ title: t('docDetail.portalGenerated') });
     },
   });
 
@@ -118,10 +120,10 @@ export default function DocumentDetail() {
     mutationFn: () => duplicateDocument(Number(id)),
     onSuccess: (newDoc) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-      toast({ title: `Duplicated as ${newDoc.document_number}` });
+      toast({ title: t('docDetail.duplicated', { number: newDoc.document_number }) });
       navigate(`/documents/${newDoc.id}`);
     },
-    onError: () => toast({ title: 'Failed to duplicate', variant: 'destructive' }),
+    onError: () => toast({ title: t('docDetail.duplicateFailed'), variant: 'destructive' }),
   });
 
   useEffect(() => {
@@ -140,22 +142,22 @@ export default function DocumentDetail() {
         case 's':
           sendDocumentEmail(Number(id)).then((data) => {
             invalidate();
-            toast({ title: `Email sent to ${data.recipient}` });
-          }).catch(() => toast({ title: 'Failed to send email', variant: 'destructive' }));
+            toast({ title: t('docDetail.emailSent', { recipient: data.recipient }) });
+          }).catch(() => toast({ title: t('docDetail.emailFailed'), variant: 'destructive' }));
           break;
         case 'd':
           duplicateDocument(Number(id)).then((newDoc) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-            toast({ title: `Duplicated as ${newDoc.document_number}` });
+            toast({ title: t('docDetail.duplicated', { number: newDoc.document_number }) });
             navigate(`/documents/${newDoc.id}`);
-          }).catch(() => toast({ title: 'Failed to duplicate', variant: 'destructive' }));
+          }).catch(() => toast({ title: t('docDetail.duplicateFailed'), variant: 'destructive' }));
           break;
       }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [doc, previewOpen, deleteOpen, convertOpen, paymentOpen, navigate, id, queryClient, invalidate]);
+  }, [doc, previewOpen, deleteOpen, convertOpen, paymentOpen, navigate, id, queryClient, invalidate, t]);
 
   if (isLoading) {
     return (
@@ -169,18 +171,18 @@ export default function DocumentDetail() {
     );
   }
 
-  if (!doc) return <EmptyState icon={FileText} title="Document not found" />;
+  if (!doc) return <EmptyState icon={FileText} title={t('docDetail.notFound')} />;
 
   const isOfferte = doc.document_type === 'offerte';
   const isRechnung = doc.document_type === 'rechnung';
-  const typeLabel = isRechnung ? 'Rechnung' : 'Offerte';
+  const typeLabel = isRechnung ? t('common.rechnung') : t('common.offerte');
   const portalUrl = doc.portal_token ? `${window.location.origin}/portal/${doc.portal_token}` : null;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/documents')}>←</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/documents')} aria-label={t('docDetail.backToList')}>←</Button>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">{doc.document_number}</h1>
           <Badge variant="outline">{typeLabel}</Badge>
@@ -194,7 +196,7 @@ export default function DocumentDetail() {
           <CardContent className="p-4 flex items-center gap-3">
             <Building2 className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">CLIENT</p>
+              <p className="text-xs text-muted-foreground uppercase">{t('common.client')}</p>
               {doc.client ? (
                 <Link to={`/clients/${doc.client_id}`} className="font-medium hover:underline">
                   {doc.client.company_name}
@@ -207,7 +209,7 @@ export default function DocumentDetail() {
           <CardContent className="p-4 flex items-center gap-3">
             <Calendar className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">DATE</p>
+              <p className="text-xs text-muted-foreground uppercase">{t('common.date')}</p>
               <p className="font-medium">{formatDate(doc.date)}</p>
             </div>
           </CardContent>
@@ -216,7 +218,7 @@ export default function DocumentDetail() {
           <CardContent className="p-4 flex items-center gap-3">
             <Clock className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">DUE DATE</p>
+              <p className="text-xs text-muted-foreground uppercase">{t('common.dueDate')}</p>
               <p className="font-medium">{formatDate(doc.due_date)}</p>
             </div>
           </CardContent>
@@ -225,8 +227,8 @@ export default function DocumentDetail() {
           <CardContent className="p-4 flex items-center gap-3">
             <CreditCard className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">PAYMENT</p>
-              <p className="font-medium">{doc.payment_terms_days} days</p>
+              <p className="text-xs text-muted-foreground uppercase">{t('docDetail.payment')}</p>
+              <p className="font-medium">{doc.payment_terms_days} {t('common.days')}</p>
             </div>
           </CardContent>
         </Card>
@@ -236,9 +238,9 @@ export default function DocumentDetail() {
       {doc.status === 'paid' && doc.paid_at && (
         <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900">
           <CardContent className="p-4 flex items-center gap-6 text-sm">
-            <div><span className="text-muted-foreground">Paid on:</span> <strong>{formatDate(doc.paid_at)}</strong></div>
-            {doc.payment_method && <div><span className="text-muted-foreground">Method:</span> <strong>{doc.payment_method}</strong></div>}
-            {doc.payment_reference && <div><span className="text-muted-foreground">Reference:</span> <strong>{doc.payment_reference}</strong></div>}
+            <div><span className="text-muted-foreground">{t('docDetail.paidOn')}</span> <strong>{formatDate(doc.paid_at)}</strong></div>
+            {doc.payment_method && <div><span className="text-muted-foreground">{t('docDetail.method')}</span> <strong>{doc.payment_method}</strong></div>}
+            {doc.payment_reference && <div><span className="text-muted-foreground">{t('docDetail.reference')}</span> <strong>{doc.payment_reference}</strong></div>}
           </CardContent>
         </Card>
       )}
@@ -247,24 +249,24 @@ export default function DocumentDetail() {
       {doc.recurrence && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Badge variant="outline">🔁 {doc.recurrence}</Badge>
-          {doc.next_recurrence_date && <span>Next: {formatDate(doc.next_recurrence_date)}</span>}
+          {doc.next_recurrence_date && <span>{t('docDetail.next')} {formatDate(doc.next_recurrence_date)}</span>}
         </div>
       )}
 
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => emailMutation.mutate()} disabled={emailMutation.isPending}>
-          <Mail className="h-4 w-4 mr-1" /> Send Email
+          <Mail className="h-4 w-4 mr-1" aria-hidden="true" /> {t('documents.sendEmail')}
         </Button>
 
         {/* Status buttons */}
         {isOfferte && doc.status === 'sent' && (
           <>
             <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => statusMutation.mutate('accepted')}>
-              <CheckCircle className="h-4 w-4 mr-1" /> Accept
+              <CheckCircle className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.accept')}
             </Button>
             <Button size="sm" variant="destructive" onClick={() => statusMutation.mutate('rejected')}>
-              <XCircle className="h-4 w-4 mr-1" /> Reject
+              <XCircle className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.reject')}
             </Button>
           </>
         )}
@@ -272,75 +274,75 @@ export default function DocumentDetail() {
         {/* Convert Offerte → Rechnung */}
         {isOfferte && (doc.status === 'accepted' || doc.status === 'sent' || doc.status === 'draft') && (
           <Button size="sm" variant="default" onClick={() => setConvertOpen(true)}>
-            <ArrowRightLeft className="h-4 w-4 mr-1" /> Convert to Rechnung
+            <ArrowRightLeft className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.convert')}
           </Button>
         )}
 
         {/* Mark as paid (with dialog) */}
         {isRechnung && doc.status !== 'paid' && doc.status !== 'cancelled' && (
           <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setPaymentOpen(true)}>
-            <DollarSign className="h-4 w-4 mr-1" /> Mark Paid
+            <DollarSign className="h-4 w-4 mr-1" aria-hidden="true" /> {t('documents.markPaid')}
           </Button>
         )}
 
         <Separator orientation="vertical" className="h-6 mx-1" />
 
         <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
-          <Eye className="h-4 w-4 mr-1" /> Vorschau
+          <Eye className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.preview')}
         </Button>
         <Button variant="outline" size="sm" onClick={() => downloadDocumentPdf(doc.id, doc.document_number, doc.document_type)}>
-          <Download className="h-4 w-4 mr-1" /> PDF
+          <Download className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.pdf')}
         </Button>
         <Button variant="outline" size="sm" onClick={() => navigate(`/documents/${doc.id}/edit`)}>
-          <Pencil className="h-4 w-4 mr-1" /> Edit
+          <Pencil className="h-4 w-4 mr-1" aria-hidden="true" /> {t('common.edit')}
         </Button>
         <Button variant="outline" size="sm" onClick={() => duplicateMutation.mutate()}
           disabled={duplicateMutation.isPending}>
-          <Copy className="h-4 w-4 mr-1" /> Duplicate
+          <Copy className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.duplicate')}
         </Button>
 
         {/* Portal link */}
         {portalUrl ? (
           <Button variant="outline" size="sm" onClick={() => {
             navigator.clipboard.writeText(portalUrl);
-            toast({ title: 'Portal link copied!' });
+            toast({ title: t('docDetail.portalCopied') });
           }}>
-            <Copy className="h-4 w-4 mr-1" /> Portal Link
+            <Copy className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.portalLink')}
           </Button>
         ) : (
           <Button variant="outline" size="sm" onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending}>
-            <Link2 className="h-4 w-4 mr-1" /> Generate Portal Link
+            <Link2 className="h-4 w-4 mr-1" aria-hidden="true" /> {t('docDetail.generatePortalLink')}
           </Button>
         )}
 
         <div className="ml-auto">
           <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="h-4 w-4 mr-1" /> Delete
+            <Trash2 className="h-4 w-4 mr-1" aria-hidden="true" /> {t('common.delete')}
           </Button>
         </div>
       </div>
 
       <p className="text-xs text-muted-foreground hidden md:block">
-        Shortcuts: <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px]">E</kbd> Edit
-        <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px] ml-2">P</kbd> Preview
-        <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px] ml-2">S</kbd> Send Email
-        <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px] ml-2">D</kbd> Duplicate
+        {t('docDetail.shortcuts')} <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px]">E</kbd> {t('common.edit')}
+        <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px] ml-2">P</kbd> {t('docDetail.preview')}
+        <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px] ml-2">S</kbd> {t('documents.sendEmail')}
+        <kbd className="px-1 py-0.5 rounded border bg-muted text-[10px] ml-2">D</kbd> {t('docDetail.duplicate')}
       </p>
 
       {/* Line Items */}
       <Card>
-        <CardHeader><CardTitle>Line Items</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('docForm.lineItems')}</CardTitle></CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" aria-label={t('docDetail.lineItemsLabel', { number: doc.document_number })}>
             <thead>
               <tr className="border-b text-muted-foreground">
-                <th className="text-left p-2 w-12">Pos</th>
-                <th className="text-left p-2">Description</th>
-                <th className="text-right p-2 w-16">Qty</th>
-                <th className="text-left p-2 w-20">Unit</th>
-                <th className="text-right p-2 w-24">Price</th>
-                <th className="text-right p-2 w-16">MwSt</th>
-                <th className="text-right p-2 w-24">Total</th>
+                <th scope="col" className="text-left p-2 w-12">{t('portal.pos')}</th>
+                <th scope="col" className="text-left p-2">{t('docForm.description')}</th>
+                <th scope="col" className="text-right p-2 w-16">{t('docForm.qty')}</th>
+                <th scope="col" className="text-left p-2 w-20">{t('docForm.unit')}</th>
+                <th scope="col" className="text-right p-2 w-24">{t('docForm.price')}</th>
+                <th scope="col" className="text-right p-2 w-16">{t('common.vat')}</th>
+                <th scope="col" className="text-right p-2 w-24">{t('common.total')}</th>
               </tr>
             </thead>
             <tbody>
@@ -362,22 +364,22 @@ export default function DocumentDetail() {
 
           <div className="flex flex-col items-end gap-1 text-sm">
             <div className="flex justify-between w-64">
-              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-muted-foreground">{t('common.subtotal')}</span>
               <span className="tabular-nums">{formatCurrency(doc.subtotal)}</span>
             </div>
             {toNum(doc.discount_percent) > 0 && (
               <div className="flex justify-between w-64 text-red-600">
-                <span>Discount ({toNum(doc.discount_percent)}%)</span>
+                <span>{t('common.discount')} ({toNum(doc.discount_percent)}%)</span>
                 <span className="tabular-nums">-{formatCurrency(doc.discount_amount)}</span>
               </div>
             )}
             <div className="flex justify-between w-64">
-              <span className="text-muted-foreground">MwSt 8.1%</span>
+              <span className="text-muted-foreground">{t('common.vat')}</span>
               <span className="tabular-nums">{formatCurrency(doc.vat_amount)}</span>
             </div>
             <Separator className="w-64 my-1" />
             <div className="flex justify-between w-64 font-bold text-base">
-              <span>Total</span>
+              <span>{t('common.total')}</span>
               <span className="tabular-nums">{formatCurrency(doc.total)}</span>
             </div>
           </div>
@@ -387,7 +389,7 @@ export default function DocumentDetail() {
       {/* Notes */}
       {doc.notes && (
         <Card>
-          <CardHeader><CardTitle>Notes</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t('common.notes')}</CardTitle></CardHeader>
           <CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{doc.notes}</p></CardContent>
         </Card>
       )}
@@ -396,8 +398,9 @@ export default function DocumentDetail() {
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title="Delete Document"
-        description={`Are you sure you want to delete ${doc.document_number}? This cannot be undone.`}
+        title={t('docDetail.deleteTitle')}
+        description={t('docDetail.deleteDesc', { number: doc.document_number })}
+        confirmLabel={t('common.delete')}
         onConfirm={() => deleteMutation.mutate()}
         isPending={deleteMutation.isPending}
         variant="destructive"
@@ -406,8 +409,9 @@ export default function DocumentDetail() {
       <ConfirmDialog
         open={convertOpen}
         onOpenChange={setConvertOpen}
-        title="Convert to Rechnung"
-        description={`Convert Offerte ${doc.document_number} to a new Rechnung? The Offerte will be marked as accepted.`}
+        title={t('docDetail.convertTitle')}
+        description={t('docDetail.convertDesc', { number: doc.document_number })}
+        confirmLabel={t('docDetail.convert')}
         onConfirm={() => convertMutation.mutate()}
         isPending={convertMutation.isPending}
       />
@@ -416,35 +420,35 @@ export default function DocumentDetail() {
       <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark as Paid</DialogTitle>
+            <DialogTitle>{t('docDetail.markPaidTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Payment Date</Label>
-              <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+              <Label htmlFor="paid-at">{t('docDetail.paymentDate')}</Label>
+              <Input id="paid-at" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
             </div>
             <div>
-              <Label>Payment Method</Label>
+              <Label id="payment-method-label">{t('docDetail.paymentMethod')}</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
+                <SelectTrigger aria-labelledby="payment-method-label"><SelectValue placeholder={t('docDetail.selectMethod')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bank_transfer">{t('docDetail.bankTransfer')}</SelectItem>
+                  <SelectItem value="cash">{t('docDetail.cash')}</SelectItem>
+                  <SelectItem value="card">{t('docDetail.card')}</SelectItem>
                   <SelectItem value="twint">TWINT</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="other">{t('docDetail.other')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Reference (optional)</Label>
-              <Input placeholder="e.g. transaction ID" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} />
+              <Label htmlFor="payment-ref">{t('docDetail.referenceOptional')}</Label>
+              <Input id="payment-ref" placeholder={t('docDetail.referencePlaceholder')} value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setPaymentOpen(false)}>{t('common.cancel')}</Button>
             <Button className="bg-green-600 hover:bg-green-700" onClick={() => paymentMutation.mutate()} disabled={paymentMutation.isPending}>
-              Confirm Payment
+              {t('docDetail.confirmPayment')}
             </Button>
           </DialogFooter>
         </DialogContent>

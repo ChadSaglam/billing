@@ -6,6 +6,7 @@ import type { CreateClientPayload } from '@/types';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,10 +50,13 @@ const emptyClient: CreateClientPayload = {
 interface ClientComboboxProps {
   value: string;
   onChange: (clientId: string) => void;
+  /** id of the visible label element (a11y: the trigger is a combobox button). */
+  labelledBy?: string;
 }
 
-export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
+export function ClientCombobox({ value, onChange, labelledBy }: ClientComboboxProps) {
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<CreateClientPayload>(emptyClient);
@@ -69,7 +73,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
       onChange(String(newClient.id));
       setDialogOpen(false);
       setForm(emptyClient);
-      toast({ title: 'Client created successfully' });
+      toast({ title: t('clients.created') });
     },
   });
 
@@ -92,6 +96,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-labelledby={labelledBy}
             className={`w-full justify-between rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all ${
               selectedClient
                 ? 'border-primary bg-primary/5 text-primary dark:bg-primary/10'
@@ -100,15 +105,15 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
           >
             {selectedClient
               ? `${selectedClient.company_name} (${selectedClient.customer_number})`
-              : 'Select a client...'}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              : t('clients.selectClient')}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden="true" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Search clients..." />
+            <CommandInput placeholder={t('clients.searchPlaceholder')} />
             <CommandList>
-              <CommandEmpty>No clients found.</CommandEmpty>
+              <CommandEmpty>{t('clients.noneCombobox')}</CommandEmpty>
               <CommandGroup>
                 {clients?.map((client) => (
                   <CommandItem
@@ -140,8 +145,8 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
                     setDialogOpen(true);
                   }}
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create New Client
+                  <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t('clients.createNew')}
                 </CommandItem>
               </CommandGroup>
             </CommandList>
@@ -152,13 +157,13 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Client</DialogTitle>
-            <DialogDescription>Fill in the details to create a new client.</DialogDescription>
+            <DialogTitle>{t('clients.new')}</DialogTitle>
+            <DialogDescription>{t('clients.newDesc')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cb_customer_number">Customer Number</Label>
+                <Label htmlFor="cb_customer_number">{t('field.customerNumber')}</Label>
                 <Input
                   id="cb_customer_number"
                   value={form.customer_number}
@@ -167,7 +172,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cb_company_name">Company Name</Label>
+                <Label htmlFor="cb_company_name">{t('field.companyName')}</Label>
                 <Input
                   id="cb_company_name"
                   value={form.company_name}
@@ -178,7 +183,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cb_contact_person">Contact Person</Label>
+                <Label htmlFor="cb_contact_person">{t('field.contactPerson')}</Label>
                 <Input
                   id="cb_contact_person"
                   value={form.contact_person || ''}
@@ -186,7 +191,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cb_email">Email</Label>
+                <Label htmlFor="cb_email">{t('field.email')}</Label>
                 <Input
                   id="cb_email"
                   type="email"
@@ -196,7 +201,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cb_phone">Phone</Label>
+              <Label htmlFor="cb_phone">{t('field.phone')}</Label>
               <Input
                 id="cb_phone"
                 value={form.phone || ''}
@@ -204,7 +209,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cb_street">Street</Label>
+              <Label htmlFor="cb_street">{t('field.street')}</Label>
               <Input
                 id="cb_street"
                 value={form.street}
@@ -214,7 +219,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cb_postal_code">Postal Code</Label>
+                <Label htmlFor="cb_postal_code">{t('field.postalCode')}</Label>
                 <Input
                   id="cb_postal_code"
                   value={form.postal_code}
@@ -223,7 +228,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cb_city">City</Label>
+                <Label htmlFor="cb_city">{t('field.city')}</Label>
                 <Input
                   id="cb_city"
                   value={form.city}
@@ -232,7 +237,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cb_country">Country</Label>
+                <Label htmlFor="cb_country">{t('field.country')}</Label>
                 <Input
                   id="cb_country"
                   value={form.country || 'Schweiz'}
@@ -241,7 +246,7 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cb_notes">Notes</Label>
+              <Label htmlFor="cb_notes">{t('field.notes')}</Label>
               <Textarea
                 id="cb_notes"
                 value={form.notes || ''}
@@ -251,10 +256,10 @@ export function ClientCombobox({ value, onChange }: ClientComboboxProps) {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Creating...' : 'Create Client'}
+                {createMutation.isPending ? t('common.creating') : t('clients.createClient')}
               </Button>
             </DialogFooter>
           </form>

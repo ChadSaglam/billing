@@ -4,6 +4,8 @@ import { getSettings, updateSettings } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import type { CompanySettings } from '@/types';
 import { toast } from '@/hooks/use-toast';
+import { useT } from '@/lib/i18n';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +20,7 @@ import { ServiceManager } from '@/components/ServiceManager';
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [form, setForm] = useState<Partial<CompanySettings>>({});
   const [serviceManagerOpen, setServiceManagerOpen] = useState(false);
 
@@ -34,9 +37,9 @@ export default function Settings() {
     mutationFn: updateSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.settings.all });
-      toast({ title: 'Settings saved successfully' });
+      toast({ title: t('settings.saved') });
     },
-    onError: () => toast({ title: 'Failed to save settings', variant: 'destructive' }),
+    onError: () => toast({ title: t('settings.saveFailed'), variant: 'destructive' }),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -59,22 +62,23 @@ export default function Settings() {
 
   const saveButton = (
     <Button type="submit" disabled={mutation.isPending} className="mt-4">
-      {mutation.isPending ? 'Saving...' : 'Save Settings'}
+      {mutation.isPending ? t('common.saving') : t('settings.save')}
     </Button>
   );
 
   return (
     <div className="p-6 max-w-4xl">
-      <PageHeader title="Settings" />
+      <PageHeader title={t('settings.title')} />
       <form onSubmit={handleSubmit}>
         <Tabs defaultValue="company">
           <TabsList>
-            <TabsTrigger value="company">Company Info</TabsTrigger>
-            <TabsTrigger value="bank">Bank Details</TabsTrigger>
-            <TabsTrigger value="defaults">Defaults</TabsTrigger>
-            <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="services">Services</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
+            <TabsTrigger value="company">{t('settings.tabCompany')}</TabsTrigger>
+            <TabsTrigger value="bank">{t('settings.tabBank')}</TabsTrigger>
+            <TabsTrigger value="defaults">{t('settings.tabDefaults')}</TabsTrigger>
+            <TabsTrigger value="templates">{t('settings.tabTemplates')}</TabsTrigger>
+            <TabsTrigger value="services">{t('settings.tabServices')}</TabsTrigger>
+            <TabsTrigger value="team">{t('settings.tabTeam')}</TabsTrigger>
+            <TabsTrigger value="language">{t('settings.tabLanguage')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="company">
@@ -103,12 +107,12 @@ export default function Settings() {
           <TabsContent value="services">
             <Card>
               <CardHeader>
-                <CardTitle>Service Templates</CardTitle>
-                <CardDescription>Manage your reusable service catalog</CardDescription>
+                <CardTitle>{t('settings.serviceTemplates')}</CardTitle>
+                <CardDescription>{t('settings.serviceTemplatesDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button type="button" onClick={() => setServiceManagerOpen(true)}>
-                  Manage Services
+                  {t('settings.manageServices')}
                 </Button>
               </CardContent>
             </Card>
@@ -116,6 +120,18 @@ export default function Settings() {
 
           <TabsContent value="team">
             <TeamTab />
+          </TabsContent>
+
+          <TabsContent value="language">
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('settings.language')}</CardTitle>
+                <CardDescription>{t('settings.languageDesc')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LanguageSwitcher variant="select" />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </form>

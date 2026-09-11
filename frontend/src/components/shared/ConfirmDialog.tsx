@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -24,11 +25,13 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   variant = 'destructive',
   isPending = false,
   onConfirm,
 }: ConfirmDialogProps) {
+  const { t } = useT();
+  const label = confirmLabel ?? t('common.confirm');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -38,10 +41,10 @@ export function ConfirmDialog({
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button variant={variant} onClick={onConfirm} disabled={isPending}>
-            {isPending ? 'Deleting...' : confirmLabel}
+            {isPending ? t('common.saving') : label}
           </Button>
         </DialogFooter>
       </DialogContent>

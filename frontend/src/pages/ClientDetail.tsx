@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query-keys";
 import type { CreateClientPayload } from "@/types";
 import { formatCurrency, formatDate, toNum } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState<CreateClientPayload>(EMPTY_CLIENT);
 
@@ -42,9 +44,9 @@ export default function ClientDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients.detail(id!) });
       setEditOpen(false);
-      toast({ title: "Client updated successfully" });
+      toast({ title: t("clients.updated") });
     },
-    onError: () => toast({ title: "Failed to update client", variant: "destructive" }),
+    onError: () => toast({ title: t("clients.updateFailed"), variant: "destructive" }),
   });
 
   const openEdit = () => {
@@ -87,16 +89,16 @@ export default function ClientDetail() {
   const renderDocumentsTable = (type?: string) => {
     const filtered = filterDocs(type);
     if (docsLoading) return <TableSkeleton rows={3} columns={5} />;
-    if (filtered.length === 0) return <EmptyState preset="documents" title="No documents found" />;
+    if (filtered.length === 0) return <EmptyState preset="documents" title={t("clients.noDocuments")} description={t("clients.noDocumentsDesc")} />;
     return (
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Number</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>{t("common.number")}</TableHead>
+            <TableHead>{t("common.type")}</TableHead>
+            <TableHead>{t("common.date")}</TableHead>
+            <TableHead className="text-right">{t("common.total")}</TableHead>
+            <TableHead>{t("common.status")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -104,7 +106,7 @@ export default function ClientDetail() {
             <TableRow key={doc.id} className="cursor-pointer" onClick={() => navigate(`/documents/${doc.id}`)}>
               <TableCell className="font-medium">{doc.document_number}</TableCell>
               <TableCell>
-                <Badge variant="outline" className="capitalize">{doc.document_type}</Badge>
+                <Badge variant="outline">{doc.document_type === "rechnung" ? t("common.rechnung") : t("common.offerte")}</Badge>
               </TableCell>
               <TableCell>{formatDate(doc.date)}</TableCell>
               <TableCell className="text-right font-mono">{formatCurrency(doc.total)}</TableCell>
@@ -129,8 +131,8 @@ export default function ClientDetail() {
   if (!client) {
     return (
       <EmptyState
-        title="Client not found"
-        action={<Button variant="link" onClick={() => navigate("/clients")}>Back to Clients</Button>}
+        title={t("clients.notFound")}
+        action={<Button variant="link" onClick={() => navigate("/clients")}>{t("clients.backToClients")}</Button>}
       />
     );
   }
@@ -139,11 +141,11 @@ export default function ClientDetail() {
     <div className="space-y-6">
       <PageHeader
         title={client.company_name}
-        description={`Customer ${client.customer_number}`}
+        description={t("clients.customer", { number: client.customer_number })}
         backButton
         actions={
           <Button variant="outline" onClick={openEdit}>
-            <Pencil className="mr-2 h-4 w-4" /> Edit Client
+            <Pencil className="mr-2 h-4 w-4" aria-hidden="true" /> {t("clients.editClient")}
           </Button>
         }
       />
@@ -153,19 +155,19 @@ export default function ClientDetail() {
         <div className="grid gap-4 sm:grid-cols-3">
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Total Invoiced</p>
+              <p className="text-xs text-muted-foreground">{t("clients.totalInvoiced")}</p>
               <p className="text-xl font-bold tabular-nums">{formatCurrency(totalInvoiced)}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Paid</p>
+              <p className="text-xs text-muted-foreground">{t("clients.paid")}</p>
               <p className="text-xl font-bold tabular-nums text-green-600">{formatCurrency(totalPaid)}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Outstanding</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.outstanding")}</p>
               <p className="text-xl font-bold tabular-nums text-orange-600">{formatCurrency(totalOutstanding)}</p>
             </CardContent>
           </Card>
@@ -177,9 +179,9 @@ export default function ClientDetail() {
         <CardContent className="pt-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" aria-hidden="true" />
               <div>
-                <p className="text-sm font-medium">Address</p>
+                <p className="text-sm font-medium">{t("clients.address")}</p>
                 <p className="text-sm text-muted-foreground">
                   {client.street}<br />
                   {client.postal_code} {client.city}<br />
@@ -189,18 +191,18 @@ export default function ClientDetail() {
             </div>
             {client.email && (
               <div className="flex items-start gap-3">
-                <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <Mail className="h-5 w-5 text-muted-foreground mt-0.5" aria-hidden="true" />
                 <div>
-                  <p className="text-sm font-medium">Email</p>
+                  <p className="text-sm font-medium">{t("field.email")}</p>
                   <p className="text-sm text-muted-foreground">{client.email}</p>
                 </div>
               </div>
             )}
             {client.phone && (
               <div className="flex items-start gap-3">
-                <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <Phone className="h-5 w-5 text-muted-foreground mt-0.5" aria-hidden="true" />
                 <div>
-                  <p className="text-sm font-medium">Phone</p>
+                  <p className="text-sm font-medium">{t("field.phone")}</p>
                   <p className="text-sm text-muted-foreground">{client.phone}</p>
                 </div>
               </div>
@@ -208,12 +210,12 @@ export default function ClientDetail() {
           </div>
           {client.contact_person && (
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm"><span className="font-medium">Contact </span>{client.contact_person}</p>
+              <p className="text-sm"><span className="font-medium">{t("clients.contact")} </span>{client.contact_person}</p>
             </div>
           )}
           {client.notes && (
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm"><span className="font-medium">Notes </span>{client.notes}</p>
+              <p className="text-sm"><span className="font-medium">{t("field.notes")} </span>{client.notes}</p>
             </div>
           )}
         </CardContent>
@@ -221,13 +223,13 @@ export default function ClientDetail() {
 
       {/* Documents */}
       <Card>
-        <CardHeader><CardTitle className="text-lg">Documents</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg">{t("clients.documents")}</CardTitle></CardHeader>
         <CardContent>
           <Tabs defaultValue="all">
             <TabsList>
-              <TabsTrigger value="all">All Documents</TabsTrigger>
-              <TabsTrigger value="offerte">Offerten</TabsTrigger>
-              <TabsTrigger value="rechnung">Rechnungen</TabsTrigger>
+              <TabsTrigger value="all">{t("clients.allDocuments")}</TabsTrigger>
+              <TabsTrigger value="offerte">{t("common.offerten")}</TabsTrigger>
+              <TabsTrigger value="rechnung">{t("common.rechnungen")}</TabsTrigger>
             </TabsList>
             <TabsContent value="all">{renderDocumentsTable()}</TabsContent>
             <TabsContent value="offerte">{renderDocumentsTable("offerte")}</TabsContent>

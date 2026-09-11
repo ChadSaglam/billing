@@ -6,6 +6,7 @@ import { getDocumentsPage, bulkUpdateStatus, bulkSendEmail, bulkDownloadPdfZip }
 import { queryKeys } from '@/lib/query-keys';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useT, type TKey } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -23,6 +24,7 @@ const PAGE_SIZE = 25;
 export default function Documents() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'all' | 'offerte' | 'rechnung'>('all');
@@ -51,7 +53,7 @@ export default function Documents() {
     mutationFn: (status: string) => bulkUpdateStatus({ document_ids: [...selected], status }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-      toast({ title: `${data.updated} documents updated` });
+      toast({ title: t('documents.updated', { count: data.updated }) });
       setSelected(new Set());
     },
   });
@@ -60,7 +62,11 @@ export default function Documents() {
     mutationFn: () => bulkSendEmail([...selected]),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-      toast({ title: `${data.queued} emails queued${data.errors.length ? `, ${data.errors.length} failed` : ''}` });
+      toast({
+        title:
+          t('documents.emailsQueued', { count: data.queued }) +
+          (data.errors.length ? t('documents.emailsFailed', { count: data.errors.length }) : ''),
+      });
       setSelected(new Set());
     },
   });
@@ -68,7 +74,7 @@ export default function Documents() {
   const bulkZipMut = useMutation({
     mutationFn: () => bulkDownloadPdfZip([...selected]),
     onSuccess: () => {
-      toast({ title: 'ZIP download started' });
+      toast({ title: t('documents.zipStarted') });
       setSelected(new Set());
     },
   });
@@ -88,40 +94,45 @@ export default function Documents() {
     else setSelected(new Set(documents.map((d) => d.id)));
   };
 
-  const tabs: { value: 'all' | 'offerte' | 'rechnung'; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'offerte', label: 'Offerten' },
-    { value: 'rechnung', label: 'Rechnungen' },
+  const tabs: { value: 'all' | 'offerte' | 'rechnung'; label: TKey }[] = [
+    { value: 'all', label: 'common.all' },
+    { value: 'offerte', label: 'common.offerten' },
+    { value: 'rechnung', label: 'common.rechnungen' },
   ];
+
+  const STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'paid', 'overdue', 'cancelled'] as const;
+  const hasFilter = tab !== 'all' || statusFilter !== 'all' || search !== '';
+  const resetFilters = () => { setTab('all'); setStatusFilter('all'); setSearch(''); setPage(1); };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Documents"
-        description="Manage your Offerten and Rechnungen"
+        title={t('documents.title')}
+        description={t('documents.description')}
         actions={
           <div className="flex gap-2">
             <Button onClick={() => navigate('/documents/new?type=offerte')} variant="outline">
-              <Plus className="h-4 w-4 mr-1" /> New Offerte
+              <Plus className="h-4 w-4 mr-1" /> {t('common.newOfferte')}
             </Button>
             <Button onClick={() => navigate('/documents/new?type=rechnung')}>
-              <Plus className="h-4 w-4 mr-1" /> New Rechnung
+              <Plus className="h-4 w-4 mr-1" /> {t('common.newRechnung')}
             </Button>
           </div>
         }
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
-        {tabs.map((t) => (
+      <div role="group" aria-label={t('documents.typeFilter')} className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
+        {tabs.map((tabItem) => (
           <button
-            key={t.value}
-            onClick={() => { setTab(t.value); setSelected(new Set()); setPage(1); }}
+            key={tabItem.value}
+            onClick={() => { setTab(tabItem.value); setSelected(new Set()); setPage(1); }}
+            aria-pressed={tab === tabItem.value}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === t.value ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              tab === tabItem.value ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {t.label}
+            {t(tabItem.label)}
           </button>
         ))}
       </div>
@@ -131,7 +142,8 @@ export default function Documents() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search documents..."
+            placeholder={t('documents.searchPlaceholder')}
+            aria-label={t('documents.searchPlaceholder')}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -147,18 +159,14 @@ export default function Documents() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[160px]" aria-label={t('documents.statusFilter')}>
+            <SelectValue placeholder={t('common.status')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="sent">Sent</SelectItem>
-            <SelectItem value="accepted">Accepted</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="all">{t('documents.allStatus')}</SelectItem>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>{t(`status.${s}`)}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -166,21 +174,21 @@ export default function Documents() {
       {/* Bulk Actions Bar */}
       {selected.size > 0 && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-3 bg-muted rounded-lg border">
-          <span className="text-sm font-medium">{selected.size} selected</span>
+          <span className="text-sm font-medium">{t('documents.selected', { count: selected.size })}</span>
           <div className="flex flex-wrap gap-2 sm:ml-auto">
             <Button size="sm" variant="outline" onClick={() => bulkEmailMut.mutate()} disabled={bulkEmailMut.isPending}>
               <Mail className="h-3.5 w-3.5 sm:mr-1" />
-              <span className="hidden sm:inline">Send Email</span>
+              <span className="hidden sm:inline">{t('documents.sendEmail')}</span>
             </Button>
             <Button size="sm" variant="outline" onClick={() => bulkStatusMut.mutate('paid')} disabled={bulkStatusMut.isPending}>
               <CheckCircle className="h-3.5 w-3.5 sm:mr-1" />
-              <span className="hidden sm:inline">Mark Paid</span>
+              <span className="hidden sm:inline">{t('documents.markPaid')}</span>
             </Button>
             <Button size="sm" variant="outline" onClick={() => bulkZipMut.mutate()} disabled={bulkZipMut.isPending}>
               <Download className="h-3.5 w-3.5 sm:mr-1" />
-              <span className="hidden sm:inline">Download ZIP</span>
+              <span className="hidden sm:inline">{t('documents.downloadZip')}</span>
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{t('documents.clear')}</Button>
           </div>
         </div>
       )}
@@ -192,15 +200,19 @@ export default function Documents() {
         <EmptyState
           preset="documents"
           icon={FileText}
-          title="No documents yet"
-          description="Create your first Offerte or Rechnung to start billing"
+          title={hasFilter ? t('documents.noneFilter') : t('documents.none')}
+          description={hasFilter ? t('documents.noneFilterDesc') : t('documents.noneDesc')}
           action={
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate('/documents/new?type=offerte')}>
-                <Plus className="h-4 w-4 mr-1" /> New Offerte
-              </Button>
+              {hasFilter ? (
+                <Button variant="outline" onClick={resetFilters}>{t('documents.resetFilters')}</Button>
+              ) : (
+                <Button variant="outline" onClick={() => navigate('/documents/new?type=offerte')}>
+                  <Plus className="h-4 w-4 mr-1" /> {t('common.newOfferte')}
+                </Button>
+              )}
               <Button onClick={() => navigate('/documents/new?type=rechnung')}>
-                <Plus className="h-4 w-4 mr-1" /> New Rechnung
+                <Plus className="h-4 w-4 mr-1" /> {t('common.newRechnung')}
               </Button>
             </div>
           }
@@ -210,7 +222,7 @@ export default function Documents() {
           {/* Desktop table */}
           <Card className="hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full" aria-label={t('documents.tableLabel')}>
                 <thead>
                   <tr className="border-b text-left text-sm text-muted-foreground">
                     <th className="p-3 w-10">
@@ -218,14 +230,15 @@ export default function Documents() {
                         type="checkbox"
                         checked={selected.size === documents.length && documents.length > 0}
                         onChange={toggleAll}
+                        aria-label={t('documents.selectAll')}
                         className="rounded"
                       />
                     </th>
-                    <th className="p-3 font-medium">Number</th>
-                    <th className="p-3 font-medium">Client</th>
-                    <th className="p-3 font-medium">Date</th>
-                    <th className="p-3 font-medium text-right">Total</th>
-                    <th className="p-3 font-medium">Status</th>
+                    <th scope="col" className="p-3 font-medium">{t('common.number')}</th>
+                    <th scope="col" className="p-3 font-medium">{t('common.client')}</th>
+                    <th scope="col" className="p-3 font-medium">{t('common.date')}</th>
+                    <th scope="col" className="p-3 font-medium text-right">{t('common.total')}</th>
+                    <th scope="col" className="p-3 font-medium">{t('common.status')}</th>
                     <th className="p-3 w-10"></th>
                   </tr>
                 </thead>
@@ -240,6 +253,7 @@ export default function Documents() {
                           type="checkbox"
                           checked={selected.has(doc.id)}
                           onChange={() => toggleSelect(doc.id)}
+                          aria-label={t('documents.selectDoc', { number: doc.document_number })}
                           className="rounded"
                         />
                       </td>
@@ -247,7 +261,7 @@ export default function Documents() {
                         {doc.document_number}
                       </td>
                       <td className="p-3 text-muted-foreground" onClick={() => navigate(`/documents/${doc.id}`)}>
-                        {doc.client?.company_name || 'No client'}
+                        {doc.client?.company_name || t('documents.noClient')}
                       </td>
                       <td className="p-3 text-muted-foreground" onClick={() => navigate(`/documents/${doc.id}`)}>
                         {formatDate(doc.date)}
@@ -285,7 +299,7 @@ export default function Documents() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground truncate max-w-[60%]">
-                      {doc.client?.company_name || 'No client'}
+                      {doc.client?.company_name || t('documents.noClient')}
                     </span>
                     <span className="font-medium tabular-nums">{formatCurrency(doc.total)}</span>
                   </div>
@@ -299,8 +313,8 @@ export default function Documents() {
           {data && data.total > 0 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>
-                {data.total} {data.total === 1 ? 'document' : 'documents'} · page {data.page} of{' '}
-                {Math.max(1, Math.ceil(data.total / data.page_size))}
+                {data.total === 1 ? t('documents.countOne') : t('documents.countMany', { count: data.total })} ·{' '}
+                {t('common.pageOf', { page: data.page, pages: Math.max(1, Math.ceil(data.total / data.page_size)) })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -309,7 +323,7 @@ export default function Documents() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
                 <Button
                   variant="outline"
@@ -317,7 +331,7 @@ export default function Documents() {
                   disabled={page * data.page_size >= data.total}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
               </div>
             </div>

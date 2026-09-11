@@ -7,6 +7,7 @@ import { queryKeys } from '@/lib/query-keys';
 import type { LineItem, CreateDocumentPayload } from '@/types';
 import { toNum } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useT } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,7 @@ export default function DocumentForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isEdit = !!id;
+  const { t } = useT();
 
   const [documentType, setDocumentType] = useState<'offerte' | 'rechnung'>(
     (searchParams.get('type') as 'offerte' | 'rechnung') || 'rechnung'
@@ -65,10 +67,10 @@ export default function DocumentForm() {
     mutationFn: createDocument,
     onSuccess: (doc) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
-      toast({ title: 'Document created successfully' });
+      toast({ title: t('docForm.created') });
       navigate(`/documents/${doc.id}`);
     },
-    onError: () => toast({ title: 'Failed to create document', variant: 'destructive' }),
+    onError: () => toast({ title: t('docForm.createFailed'), variant: 'destructive' }),
   });
 
   const updateMutation = useMutation({
@@ -76,16 +78,16 @@ export default function DocumentForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.documents.detail(id!) });
-      toast({ title: 'Document updated successfully' });
+      toast({ title: t('docForm.updated') });
       navigate(`/documents/${id}`);
     },
-    onError: () => toast({ title: 'Failed to update document', variant: 'destructive' }),
+    onError: () => toast({ title: t('docForm.updateFailed'), variant: 'destructive' }),
   });
 
   const handleSubmit = (status: string) => {
-    if (!clientId) return toast({ title: 'Please select a client', variant: 'destructive' });
+    if (!clientId) return toast({ title: t('docForm.selectClient'), variant: 'destructive' });
     if (lineItems.length === 0 || lineItems.every((li) => !li.description))
-      return toast({ title: 'Please add at least one line item', variant: 'destructive' });
+      return toast({ title: t('docForm.addLine'), variant: 'destructive' });
 
     const payload: CreateDocumentPayload = {
       document_type: documentType,
@@ -115,7 +117,7 @@ export default function DocumentForm() {
   return (
     <div className="space-y-6 max-w-4xl">
       <PageHeader
-        title={isEdit ? 'Edit Document' : 'New Document'}
+        title={isEdit ? t('docForm.editTitle') : t('docForm.newTitle')}
         backButton
         badge={
           <Badge
@@ -126,7 +128,7 @@ export default function DocumentForm() {
             }`}
             variant="outline"
           >
-            {documentType}
+            {documentType === 'offerte' ? t('common.offerte') : t('common.rechnung')}
           </Badge>
         }
       />
@@ -148,10 +150,11 @@ export default function DocumentForm() {
       <LineItemsEditor items={lineItems} onChange={setLineItems} discountPercent={discountPercent} />
 
       <Card>
-        <CardHeader><CardTitle className="text-lg">Notes</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg"><label htmlFor="doc-notes">{t('common.notes')}</label></CardTitle></CardHeader>
         <CardContent>
           <Textarea
-            placeholder="Additional notes, payment details, terms..."
+            id="doc-notes"
+            placeholder={t('docForm.notesPlaceholder')}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
@@ -163,14 +166,14 @@ export default function DocumentForm() {
       {/* Sticky bottom bar */}
       <div className="sticky bottom-0 -mx-6 px-6 py-4 bg-background/80 backdrop-blur-sm border-t">
         <div className="flex justify-end gap-3 max-w-4xl">
-          <Button variant="ghost" onClick={() => navigate(-1)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => navigate(-1)}>{t('common.cancel')}</Button>
           <Button variant="outline" onClick={() => handleSubmit('draft')} disabled={isPending}>
             <Save className="mr-2 h-4 w-4" />
-            {isPending ? 'Saving...' : 'Save Draft'}
+            {isPending ? t('common.saving') : t('docForm.saveDraft')}
           </Button>
           <Button onClick={() => handleSubmit('sent')} disabled={isPending}>
             <SendHorizontal className="mr-2 h-4 w-4" />
-            {isPending ? 'Saving...' : isEdit ? 'Update & Send' : 'Create & Send'}
+            {isPending ? t('common.saving') : isEdit ? t('docForm.updateSend') : t('docForm.createSend')}
           </Button>
         </div>
       </div>

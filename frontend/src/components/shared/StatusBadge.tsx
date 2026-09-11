@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useT, statusLabel } from "@/lib/i18n";
 
 const STATUS_STYLES: Record<string, { bg: string; dot: string }> = {
   draft:     { bg: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300", dot: "bg-gray-400" },
@@ -11,27 +12,18 @@ const STATUS_STYLES: Record<string, { bg: string; dot: string }> = {
   cancelled: { bg: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500", dot: "bg-gray-400" },
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  accepted: "Accepted",
-  rejected: "Rejected",
-  paid: "Paid",
-  overdue: "Overdue",
-  cancelled: "Cancelled",
-};
-
 interface StatusBadgeProps {
   status: string;
   className?: string;
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+  const { locale } = useT();
   const style = STATUS_STYLES[status] ?? STATUS_STYLES.draft;
   return (
     <Badge variant="secondary" className={cn("capitalize font-medium border-0 gap-1.5", style.bg, className)}>
-      <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} />
-      {STATUS_LABELS[status] ?? status}
+      <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} aria-hidden="true" />
+      {statusLabel(status, locale)}
     </Badge>
   );
 }
