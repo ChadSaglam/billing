@@ -3,6 +3,7 @@
 No network: every HTTP call goes through an `httpx.MockTransport` swapped in
 for `events.http_client`.
 """
+
 import datetime as dt
 import hashlib
 import hmac
@@ -89,6 +90,7 @@ def _pending(db):
 
 # ── emit on transition ────────────────────────────────────────────────
 
+
 def test_paid_transition_emits_contract_payload(client, db, make_tenant, unconfigured):
     t = make_tenant()
     cid = _client(client, t["headers"])
@@ -135,7 +137,9 @@ def test_resaving_a_paid_invoice_does_not_emit_again(client, db, make_tenant, un
     url = f"/api/documents/{doc['id']}/status"
 
     assert client.patch(url, json={"status": "paid"}, headers=t["headers"]).status_code == 200
-    assert client.patch(url, json={"status": "paid", "payment_method": "twint"}, headers=t["headers"]).status_code == 200
+    assert (
+        client.patch(url, json={"status": "paid", "payment_method": "twint"}, headers=t["headers"]).status_code == 200
+    )
     assert len(_pending(db)) == 1
 
     # Back to sent and paid again is a new transition → a second event.
@@ -148,8 +152,16 @@ def test_offerte_status_changes_never_emit(client, db, make_tenant, unconfigured
     t = make_tenant()
     cid = _client(client, t["headers"])
     doc = _document(client, t["headers"], cid, document_type="offerte")
-    assert client.patch(f"/api/documents/{doc['id']}/status", json={"status": "accepted"}, headers=t["headers"]).status_code == 200
-    assert client.patch(f"/api/documents/{doc['id']}/status", json={"status": "sent"}, headers=t["headers"]).status_code == 200
+    assert (
+        client.patch(
+            f"/api/documents/{doc['id']}/status", json={"status": "accepted"}, headers=t["headers"]
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(f"/api/documents/{doc['id']}/status", json={"status": "sent"}, headers=t["headers"]).status_code
+        == 200
+    )
     assert _pending(db) == []
 
 
@@ -158,7 +170,10 @@ def test_bulk_paid_emits_once_per_transition(client, db, make_tenant, unconfigur
     cid = _client(client, t["headers"])
     a = _document(client, t["headers"], cid)
     b = _document(client, t["headers"], cid)
-    assert client.patch(f"/api/documents/{a['id']}/status", json={"status": "paid"}, headers=t["headers"]).status_code == 200
+    assert (
+        client.patch(f"/api/documents/{a['id']}/status", json={"status": "paid"}, headers=t["headers"]).status_code
+        == 200
+    )
 
     resp = client.post(
         "/api/documents/bulk/status",
@@ -185,8 +200,20 @@ def test_status_change_triggers_immediate_delivery_attempt(client, make_tenant, 
 
 # ── delivery ──────────────────────────────────────────────────────────
 
+
 def _queue(db, tid=1, payload=None):
-    row = events.emit(db, "invoice.paid", tid, payload or {"event": "invoice.paid", "version": 1, "tid": tid, "invoice": {"id": 1, "total": "1.00", "client": {"name": "Ümlaut & Co"}}})
+    row = events.emit(
+        db,
+        "invoice.paid",
+        tid,
+        payload
+        or {
+            "event": "invoice.paid",
+            "version": 1,
+            "tid": tid,
+            "invoice": {"id": 1, "total": "1.00", "client": {"name": "Ümlaut & Co"}},
+        },
+    )
     db.commit()
     return row
 

@@ -9,6 +9,7 @@ even if both are on.
     python -m app.jobs          # loop forever
     python -m app.jobs --once   # one pass, then exit (smoke tests, cron)
 """
+
 import argparse
 import logging
 import signal

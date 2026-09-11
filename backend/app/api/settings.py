@@ -14,15 +14,18 @@ from app.services.tenancy import scoped
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
+
 def _get_settings(db: Session, tenant_id: int) -> CompanySettings:
     settings = scoped(db, CompanySettings, tenant_id).first()
     if not settings:
         raise HTTPException(status_code=404, detail="Settings not found")
     return settings
 
+
 @router.get("", response_model=SettingsRead)
 def get_settings(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     return _get_settings(db, tenant_id)
+
 
 @router.put("", response_model=SettingsRead, dependencies=[Depends(require_editor)])
 def update_settings(data: SettingsUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
@@ -32,6 +35,7 @@ def update_settings(data: SettingsUpdate, db: Session = Depends(get_db), tenant_
     db.commit()
     db.refresh(settings)
     return settings
+
 
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB
 # SVG is deliberately excluded: it is an XML document that can carry <script>,

@@ -30,7 +30,9 @@ def list_services(
 
 
 @router.post("", response_model=ServiceTemplateRead, status_code=201, dependencies=[Depends(require_editor)])
-def create_service(payload: ServiceTemplateCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def create_service(
+    payload: ServiceTemplateCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)
+):
     svc = ServiceTemplate(**payload.model_dump(), tenant_id=tenant_id)
     db.add(svc)
     db.commit()

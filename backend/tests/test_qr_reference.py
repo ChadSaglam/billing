@@ -10,6 +10,7 @@ Two reference schemes exist on a Swiss QR bill:
 Vectors come from the ISO 11649 example (`539007547034` → `RF18…`) and the
 SIX "Swiss Payment Standards" implementation guidelines.
 """
+
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -34,6 +35,7 @@ def _iso7064_remainder(ref: str) -> int:
 
 
 # ── ISO 11649 (SCOR) ─────────────────────────────────────────
+
 
 def test_iso11649_known_vector():
     assert generate_creditor_reference("539007547034") == "RF18539007547034"
@@ -86,6 +88,7 @@ def test_format_creditor_reference_groups_of_four():
 
 # ── MOD10 recursive (QRR) ────────────────────────────────────
 
+
 def test_mod10_recursive_known_vector():
     # SIX implementation guideline example: 26 digits → check digit 7.
     assert mod10_recursive("21000000000313947143000901") == 7
@@ -128,6 +131,7 @@ def test_qr_reference_strips_non_digits_and_limits_length():
 
 # ── IBAN helpers ─────────────────────────────────────────────
 
+
 @pytest.mark.parametrize("iban", ["CH93 0076 2011 6238 5295 7", "LI21 0881 0000 2324 0130 0"])
 def test_validate_qr_iban_accepts_ch_and_li(iban):
     assert validate_qr_iban(iban)
@@ -148,16 +152,28 @@ def test_is_qr_iban_uses_the_qr_iid_range():
 
 # ── EUR variant on the QR slip ───────────────────────────────
 
+
 def _make_doc(currency: str):
     from types import SimpleNamespace
 
     client = SimpleNamespace(
-        company_name="Debtor AG", street="Rue 1", postal_code="1200", city="Genève", country="CH",
-        contact_person=None, customer_number="K-1", email=None,
+        company_name="Debtor AG",
+        street="Rue 1",
+        postal_code="1200",
+        city="Genève",
+        country="CH",
+        contact_person=None,
+        customer_number="K-1",
+        email=None,
     )
     return SimpleNamespace(
-        document_type="rechnung", document_number="RE-7", date=None, due_date=None,
-        client=client, total=Decimal("1234.50"), currency=currency,
+        document_type="rechnung",
+        document_number="RE-7",
+        date=None,
+        due_date=None,
+        client=client,
+        total=Decimal("1234.50"),
+        currency=currency,
     )
 
 
@@ -165,8 +181,14 @@ def _make_settings():
     from types import SimpleNamespace
 
     return SimpleNamespace(
-        company_name="Creditor GmbH", street="Bahnhofstrasse 1", postal_code="8001", city="Zürich",
-        iban="CH93 0076 2011 6238 5295 7", uid="CHE-123.456.789", phone="", email="",
+        company_name="Creditor GmbH",
+        street="Bahnhofstrasse 1",
+        postal_code="8001",
+        city="Zürich",
+        iban="CH93 0076 2011 6238 5295 7",
+        uid="CHE-123.456.789",
+        phone="",
+        email="",
         pdf_template="modern",
     )
 

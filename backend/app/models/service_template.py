@@ -16,11 +16,7 @@ class ServiceTemplate(Base):
     category: Mapped[str] = mapped_column(String(100), nullable=False, default="General")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     unit: Mapped[str] = mapped_column(String(50), nullable=False, default="Stunde")
-    default_price: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2), nullable=False, server_default="250.00"
-    )
+    default_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, server_default="250.00")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())

@@ -1,4 +1,5 @@
 """SSO hand-off, issuer side (R-103, chadev-platform/contracts/sso.md)."""
+
 import re
 from urllib.parse import urlsplit
 
@@ -96,7 +97,9 @@ def test_tenant_snapshot_fields(client, db, make_tenant, platform_configured):
     tenant = db.get(Tenant, user.tenant_id)
     claims = jwt.decode(
         _token_from(_launch(client, t["headers"]).json()["url"]),
-        SECRET, algorithms=["HS256"], audience="buchhaltung",
+        SECRET,
+        algorithms=["HS256"],
+        audience="buchhaltung",
     )
     snapshot = claims["tenant"]
     assert set(snapshot) == {"name", "slug", "subscription_plan", "trial_ends_at"}
@@ -115,7 +118,9 @@ def test_tenant_snapshot_without_trial(client, db, make_tenant, platform_configu
     db.commit()
     claims = jwt.decode(
         _token_from(_launch(client, t["headers"]).json()["url"]),
-        SECRET, algorithms=["HS256"], audience="buchhaltung",
+        SECRET,
+        algorithms=["HS256"],
+        audience="buchhaltung",
     )
     assert claims["tenant"]["subscription_plan"] == "pro"
     assert claims["tenant"]["trial_ends_at"] is None
@@ -126,7 +131,9 @@ def test_every_jti_is_unique(client, make_tenant, platform_configured):
     jtis = {
         jwt.decode(
             _token_from(_launch(client, t["headers"]).json()["url"]),
-            SECRET, algorithms=["HS256"], audience="buchhaltung",
+            SECRET,
+            algorithms=["HS256"],
+            audience="buchhaltung",
         )["jti"]
         for _ in range(3)
     }
@@ -135,7 +142,14 @@ def test_every_jti_is_unique(client, make_tenant, platform_configured):
 
 @pytest.mark.parametrize(
     ("billing_role", "expected"),
-    [("owner", "owner"), ("admin", "admin"), ("editor", "editor"), ("viewer", "viewer"), ("weird", "viewer"), (None, "viewer")],
+    [
+        ("owner", "owner"),
+        ("admin", "admin"),
+        ("editor", "editor"),
+        ("viewer", "viewer"),
+        ("weird", "viewer"),
+        (None, "viewer"),
+    ],
 )
 def test_role_mapping(billing_role, expected):
     assert platform_role(billing_role) == expected
@@ -148,6 +162,8 @@ def test_launch_carries_the_users_role(client, db, make_tenant, platform_configu
     db.commit()
     claims = jwt.decode(
         _token_from(_launch(client, t["headers"]).json()["url"]),
-        SECRET, algorithms=["HS256"], audience="buchhaltung",
+        SECRET,
+        algorithms=["HS256"],
+        audience="buchhaltung",
     )
     assert claims["role"] == "editor"

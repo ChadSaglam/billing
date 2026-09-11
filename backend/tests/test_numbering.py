@@ -1,4 +1,5 @@
 """Per-tenant document numbering (R-04, R-37)."""
+
 import uuid
 
 
@@ -17,9 +18,7 @@ def _doc_payload(client_id):
         "document_type": "rechnung",
         "client_id": client_id,
         "date": "2026-01-15",
-        "line_items": [
-            {"position": 1, "description": "Beratung", "quantity": "1", "unit_price": "100.00"}
-        ],
+        "line_items": [{"position": 1, "description": "Beratung", "quantity": "1", "unit_price": "100.00"}],
     }
 
 

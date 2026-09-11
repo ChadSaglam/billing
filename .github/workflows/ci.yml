@@ -64,7 +64,6 @@ jobs:
 
       - name: Ruff format check
         run: ruff format --check app tests
-        continue-on-error: true
 
       - name: Alembic upgrade head
         run: alembic upgrade head

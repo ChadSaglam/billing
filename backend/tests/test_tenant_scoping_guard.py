@@ -7,6 +7,7 @@ few deliberate exceptions (lookups by email, refresh-token jti, portal token)
 are listed in ALLOWLIST with a reason, and each entry must still match so
 the list cannot rot.
 """
+
 import ast
 import pathlib
 
@@ -16,14 +17,26 @@ API_DIR = pathlib.Path(__file__).resolve().parents[1] / "app" / "api"
 
 # (file, substring of the statement, why it is safe without a tenant filter)
 ALLOWLIST = [
-    ("auth.py", "db.query(User).filter(User.email == data.email)",
-     "register/login look a user up by globally unique email; the tenant comes from the row"),
-    ("auth.py", "db.query(RefreshToken).filter(RefreshToken.jti ==",
-     "refresh/logout resolve a token by its jti; the tenant comes from the row"),
-    ("users.py", "db.query(User).filter(User.email == data.email)",
-     "invite checks that the email is unused across all tenants"),
-    ("portal.py", "filter(Document.portal_token == token)",
-     "public portal is keyed by the unguessable portal token instead of a session"),
+    (
+        "auth.py",
+        "db.query(User).filter(User.email == data.email)",
+        "register/login look a user up by globally unique email; the tenant comes from the row",
+    ),
+    (
+        "auth.py",
+        "db.query(RefreshToken).filter(RefreshToken.jti ==",
+        "refresh/logout resolve a token by its jti; the tenant comes from the row",
+    ),
+    (
+        "users.py",
+        "db.query(User).filter(User.email == data.email)",
+        "invite checks that the email is unused across all tenants",
+    ),
+    (
+        "portal.py",
+        "filter(Document.portal_token == token)",
+        "public portal is keyed by the unguessable portal token instead of a session",
+    ),
 ]
 
 SCOPED_MARKERS = ("scoped(", "get_or_404(", "tenant_id ==")
@@ -91,9 +104,7 @@ def test_every_router_query_on_a_tenant_model_is_scoped():
         for segment in _statements_with_tenant_queries(path, names):
             if any(marker in segment for marker in SCOPED_MARKERS):
                 continue
-            allowed = [
-                entry for entry in ALLOWLIST if entry[0] == path.name and entry[1] in segment
-            ]
+            allowed = [entry for entry in ALLOWLIST if entry[0] == path.name and entry[1] in segment]
             if allowed:
                 used_allowlist.update(allowed)
                 continue

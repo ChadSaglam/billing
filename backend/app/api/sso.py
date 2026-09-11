@@ -9,6 +9,7 @@ Everything here is gated on `PLATFORM_SHARED_SECRET` + the target URL: when
 either is unset the routes answer 404, so an unconfigured install exposes
 no SSO surface at all.
 """
+
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -44,9 +45,7 @@ def tenant_snapshot(tenant: Tenant) -> dict:
         "name": tenant.name,
         "slug": tenant.slug,
         "subscription_plan": tenant.subscription_plan,
-        "trial_ends_at": (
-            trial_ends.replace(microsecond=0, tzinfo=None).isoformat() + "Z" if trial_ends else None
-        ),
+        "trial_ends_at": (trial_ends.replace(microsecond=0, tzinfo=None).isoformat() + "Z" if trial_ends else None),
     }
 
 
@@ -100,7 +99,5 @@ def launch(request: Request, app: str, user: User = Depends(get_current_user)) -
     if target is None or not settings.PLATFORM_SHARED_SECRET:
         raise HTTPException(status_code=404, detail="SSO target not available")
 
-    token = create_sso_token(
-        user, user.tenant, audience=target["id"], secret=settings.PLATFORM_SHARED_SECRET
-    )
+    token = create_sso_token(user, user.tenant, audience=target["id"], secret=settings.PLATFORM_SHARED_SECRET)
     return {"url": f"{target['url']}/sso#token={token}"}

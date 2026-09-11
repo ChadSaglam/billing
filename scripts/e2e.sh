@@ -46,10 +46,11 @@ with conn.cursor() as c:
 conn.close()
 PY
   (cd "$ROOT/backend" && DATABASE_URL="$E2E_DATABASE_URL" SECRET_KEY=e2e "$PY" -m alembic upgrade head >/dev/null)
-  echo "→ API on :$API_PORT"
+  echo "→ API on :$API_PORT (log: frontend/test-results/api.log)"
+  mkdir -p "$ROOT/frontend/test-results"
   env -C "$ROOT/backend" DATABASE_URL="$E2E_DATABASE_URL" SECRET_KEY=e2e APP_ENV=test RUN_JOBS_IN_API=false \
     ALLOWED_ORIGINS="http://localhost:${E2E_FRONTEND_PORT:-5150},http://127.0.0.1:${E2E_FRONTEND_PORT:-5150}" \
-    "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" --log-level warning &
+    "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" --log-level warning >"$ROOT/frontend/test-results/api.log" 2>&1 &
   started=$!
   trap '[[ -n "$started" ]] && kill "$started" 2>/dev/null || true' EXIT
   for _ in $(seq 1 60); do listening "$API_PORT" && break; sleep 0.5; done

@@ -11,12 +11,7 @@ def generate_document_number(db: Session, document_type: str, tenant_id: int) ->
     business volume (R-37). The row is locked FOR UPDATE so two concurrent
     requests cannot receive the same number.
     """
-    settings = (
-        db.query(CompanySettings)
-        .filter(CompanySettings.tenant_id == tenant_id)
-        .with_for_update()
-        .first()
-    )
+    settings = db.query(CompanySettings).filter(CompanySettings.tenant_id == tenant_id).with_for_update().first()
     if not settings:
         raise RuntimeError(f"Company settings not initialized for tenant {tenant_id}")
 

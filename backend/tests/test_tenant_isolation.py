@@ -1,4 +1,5 @@
 """Multi-tenant isolation — the security property this SaaS lives or dies on."""
+
 import uuid
 
 import pytest
@@ -51,9 +52,7 @@ def test_document_is_not_readable_cross_tenant(client, two_tenants):
             "document_type": "rechnung",
             "client_id": client_id,
             "date": "2026-01-15",
-            "line_items": [
-                {"position": 1, "description": "Beratung", "quantity": "2", "unit_price": "250.00"}
-            ],
+            "line_items": [{"position": 1, "description": "Beratung", "quantity": "2", "unit_price": "250.00"}],
         },
         headers=a["headers"],
     )

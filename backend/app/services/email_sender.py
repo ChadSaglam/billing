@@ -139,7 +139,11 @@ def send_document_email(email: DocumentEmail) -> None:
         contact_parts.append(f"Tel: {email.company_phone}")
     if email.company_email:
         contact_parts.append(f"E-Mail: {email.company_email}")
-    contact_section = f'<p style="color:#6b7280;font-size:13px;margin-top:24px;">{" · ".join(contact_parts)}</p>' if contact_parts else ""
+    contact_section = (
+        f'<p style="color:#6b7280;font-size:13px;margin-top:24px;">{" · ".join(contact_parts)}</p>'
+        if contact_parts
+        else ""
+    )
 
     def _fmt_amount(val):
         return f"{float(val):,.2f}".replace(",", "'")
@@ -183,6 +187,4 @@ def send_document_emails(emails: list[DocumentEmail]) -> None:
         try:
             send_document_email(email)
         except Exception:
-            logger.exception(
-                "Email failed: %s → %s", email.document_number, email.recipient_email
-            )
+            logger.exception("Email failed: %s → %s", email.document_number, email.recipient_email)

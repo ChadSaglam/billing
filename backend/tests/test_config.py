@@ -4,6 +4,7 @@ This is deliberately end-to-end through Settings rather than a unit test of
 the parser: the bug it guards against lived in pydantic-settings' own value
 decoding, upstream of anything the parser could see.
 """
+
 import pytest
 
 from app.config import Settings

@@ -1,4 +1,5 @@
 """configure_sentry("") is a no-op that never imports the SDK (R-91)."""
+
 import sys
 
 from app.core.sentry import configure_sentry

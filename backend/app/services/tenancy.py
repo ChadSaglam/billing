@@ -5,6 +5,7 @@ by hand — one forgotten filter is a cross-tenant leak. `scoped()` is the one
 place that filter lives; `tests/test_tenant_scoping_guard.py` fails the build
 when a router queries a tenant-bearing model without going through here.
 """
+
 from typing import Any
 
 from fastapi import HTTPException

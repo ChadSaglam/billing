@@ -10,9 +10,11 @@ class MonthlyRevenue(BaseModel):
     revenue: Decimal
     outstanding: Decimal
 
+
 class StatusCount(BaseModel):
     status: str
     count: int
+
 
 class DashboardStats(BaseModel):
     model_config = {"from_attributes": True}

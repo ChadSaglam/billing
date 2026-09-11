@@ -3,6 +3,7 @@
 Authenticated expensive routes are throttled per tenant (`tid` from the
 Bearer token); anonymous routes keep the per-IP bucket.
 """
+
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 

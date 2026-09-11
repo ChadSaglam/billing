@@ -9,6 +9,7 @@ One pass = `run_scheduled_jobs()`. It is called from two places:
 Both go through the same Postgres advisory lock, so however many API
 workers and job runners exist, exactly one of them executes a given pass.
 """
+
 import asyncio
 import logging
 
@@ -39,9 +40,7 @@ def run_scheduled_jobs(db: Session, source: str) -> None:
 
     locked = False
     if db.bind.dialect.name == "postgresql":
-        locked = db.execute(
-            text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": JOBS_LOCK_ID}
-        ).scalar()
+        locked = db.execute(text("SELECT pg_try_advisory_lock(:lock_id)"), {"lock_id": JOBS_LOCK_ID}).scalar()
         if not locked:
             return  # another process owns this pass
     try:
@@ -57,14 +56,10 @@ def run_scheduled_jobs(db: Session, source: str) -> None:
         # `python -m app.jobs` and the in-API loop both deliver.
         events = deliver_pending(db)
         if events["delivered"] or events["failed"]:
-            logger.info(
-                "[%s] Platform events: %d delivered, %d failed", source, events["delivered"], events["failed"]
-            )
+            logger.info("[%s] Platform events: %d delivered, %d failed", source, events["delivered"], events["failed"])
     finally:
         if locked:
-            db.execute(
-                text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": JOBS_LOCK_ID}
-            )
+            db.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": JOBS_LOCK_ID})
 
 
 def run_jobs_once(source: str) -> None:

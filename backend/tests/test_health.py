@@ -1,5 +1,6 @@
 """`/api/health` contract (R-75) — consumed unauthenticated by CI and the
 compose healthcheck, so the key set is a contract."""
+
 import importlib
 
 from fastapi.testclient import TestClient

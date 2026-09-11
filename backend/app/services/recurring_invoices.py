@@ -61,16 +61,18 @@ def process_recurring_invoices(db: Session) -> int:
         db.flush()
 
         for item in doc.line_items:
-            db.add(LineItem(
-                document_id=new_doc.id,
-                position=item.position,
-                description=item.description,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                total_price=item.total_price,
-                unit=item.unit,
-                vat_rate=item.vat_rate,
-            ))
+            db.add(
+                LineItem(
+                    document_id=new_doc.id,
+                    position=item.position,
+                    description=item.description,
+                    quantity=item.quantity,
+                    unit_price=item.unit_price,
+                    total_price=item.total_price,
+                    unit=item.unit,
+                    vat_rate=item.vat_rate,
+                )
+            )
 
         doc.next_recurrence_date = new_date + delta
         created += 1

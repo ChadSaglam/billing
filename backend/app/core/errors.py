@@ -107,8 +107,7 @@ def install_error_handlers(app: FastAPI) -> None:
     async def _validation_exc(request: Request, exc: RequestValidationError):
         errors = exc.errors()
         fields = [
-            {"field": ".".join(str(p) for p in err.get("loc", ())[1:]), "message": err.get("msg", "")}
-            for err in errors
+            {"field": ".".join(str(p) for p in err.get("loc", ())[1:]), "message": err.get("msg", "")} for err in errors
         ]
         return JSONResponse(
             status_code=422,

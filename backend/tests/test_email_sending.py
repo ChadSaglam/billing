@@ -1,5 +1,6 @@
 """Document emails go to a BackgroundTask as plain values (R-67) and the
 bulk endpoint queues instead of sending SMTP in-request (R-73)."""
+
 import dataclasses
 import uuid
 from datetime import date
@@ -134,10 +135,20 @@ def test_bulk_sender_continues_after_a_failure(monkeypatch):
 
     monkeypatch.setattr(email_sender, "send_document_email", _send)
     mk = lambda n: DocumentEmail(  # noqa: E731
-        recipient_email="k@example.com", recipient_name="K", document_type="rechnung",
-        document_number=n, date=None, due_date=None, payment_terms_days=None,
-        currency="CHF", total=Decimal("1"), portal_token=None, company_name="C",
-        company_phone=None, company_email=None, pdf_bytes=b"%PDF",
+        recipient_email="k@example.com",
+        recipient_name="K",
+        document_type="rechnung",
+        document_number=n,
+        date=None,
+        due_date=None,
+        payment_terms_days=None,
+        currency="CHF",
+        total=Decimal("1"),
+        portal_token=None,
+        company_name="C",
+        company_phone=None,
+        company_email=None,
+        pdf_bytes=b"%PDF",
     )
     email_sender.send_document_emails([mk("1"), mk("2")])
     assert calls == ["1", "2"]

@@ -1,4 +1,5 @@
 """Role enforcement (R-07). A viewer must not be able to write anything."""
+
 import uuid
 
 import pytest
@@ -34,9 +35,7 @@ def viewer_headers(client, db, make_tenant):
     db.add(viewer)
     db.flush()
 
-    token = client.post(
-        "/api/auth/login", json={"email": viewer.email, "password": password}
-    ).json()["access_token"]
+    token = client.post("/api/auth/login", json={"email": viewer.email, "password": password}).json()["access_token"]
     return {"Authorization": f"Bearer {token}"}, owner["headers"]
 
 

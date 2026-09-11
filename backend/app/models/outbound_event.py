@@ -24,9 +24,7 @@ class OutboundEvent(Base):
     event: Mapped[str] = mapped_column(String(64), nullable=False)
     tid: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     # One per delivery group; every retry reuses it so the receiver can dedupe.
-    delivery_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, nullable=False, unique=True, index=True, default=uuid.uuid4
-    )
+    delivery_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, unique=True, index=True, default=uuid.uuid4)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     next_attempt_at: Mapped[dt.datetime] = mapped_column(

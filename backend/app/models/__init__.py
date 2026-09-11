@@ -9,6 +9,13 @@ from app.models.tenant import Tenant
 from app.models.user import User
 
 __all__ = [
-    "Client", "Document", "LineItem", "RefreshToken", "ServiceTemplate",
-    "CompanySettings", "Tenant", "User", "OutboundEvent",
+    "Client",
+    "Document",
+    "LineItem",
+    "RefreshToken",
+    "ServiceTemplate",
+    "CompanySettings",
+    "Tenant",
+    "User",
+    "OutboundEvent",
 ]

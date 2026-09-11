@@ -1,4 +1,5 @@
 """Edit paths that used to corrupt or crash a document (R-66, R-69, R-70, R-72)."""
+
 import io
 import uuid
 from decimal import Decimal
@@ -41,6 +42,7 @@ def _invoice(client, headers, cid, **extra):
 
 # ── R-66 ──────────────────────────────────────────────────────
 
+
 def test_discount_only_update_recalculates_totals(client, make_tenant):
     t = make_tenant()
     cid = _client(client, t["headers"])
@@ -60,6 +62,7 @@ def test_discount_only_update_recalculates_totals(client, make_tenant):
 
 
 # ── R-69 ──────────────────────────────────────────────────────
+
 
 def test_update_with_null_payment_terms_does_not_crash(client, make_tenant):
     t = make_tenant()
@@ -104,6 +107,7 @@ def test_update_recomputes_due_date_from_terms_when_not_sent(client, make_tenant
 
 # ── R-70 ──────────────────────────────────────────────────────
 
+
 def test_duplicate_with_null_payment_terms_does_not_crash(client, make_tenant):
     t = make_tenant()
     cid = _client(client, t["headers"])
@@ -120,6 +124,7 @@ def test_duplicate_with_null_payment_terms_does_not_crash(client, make_tenant):
 
 
 # ── R-72 ──────────────────────────────────────────────────────
+
 
 def _pdf_text(content: bytes) -> str:
     return "\n".join(page.extract_text() for page in PdfReader(io.BytesIO(content)).pages)
@@ -168,6 +173,7 @@ def test_classic_template_escapes_names_too(client, make_tenant):
 
 
 # ── R-68 ──────────────────────────────────────────────────────
+
 
 @pytest.mark.parametrize("template", ["modern", "classic"])
 def test_pdf_prints_document_currency_not_hardcoded_chf(client, make_tenant, template):

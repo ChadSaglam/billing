@@ -1,4 +1,5 @@
 """Money is computed by the server, never accepted from the client (R-31)."""
+
 import uuid
 from decimal import Decimal
 
@@ -48,13 +49,18 @@ def test_forged_line_total_is_ignored(client, make_tenant):
     cid = _client(client, t["headers"])
     resp = client.post(
         "/api/documents",
-        json=_doc(cid, [{
-            "position": 1,
-            "description": "Beratung",
-            "quantity": "2",
-            "unit_price": "250.00",
-            "total_price": "1.00",
-        }]),
+        json=_doc(
+            cid,
+            [
+                {
+                    "position": 1,
+                    "description": "Beratung",
+                    "quantity": "2",
+                    "unit_price": "250.00",
+                    "total_price": "1.00",
+                }
+            ],
+        ),
         headers=t["headers"],
     )
     assert resp.status_code == 201, resp.text
@@ -94,10 +100,12 @@ def test_totals_survive_a_line_item_edit(client, make_tenant):
 
     resp = client.put(
         f"/api/documents/{doc_id}",
-        json={"line_items": [
-            {"position": 1, "description": "Beratung", "quantity": "3", "unit_price": "100.00"},
-            {"position": 2, "description": "Reise", "quantity": "1", "unit_price": "50.00"},
-        ]},
+        json={
+            "line_items": [
+                {"position": 1, "description": "Beratung", "quantity": "3", "unit_price": "100.00"},
+                {"position": 2, "description": "Reise", "quantity": "1", "unit_price": "50.00"},
+            ]
+        },
         headers=t["headers"],
     )
     assert resp.status_code == 200, resp.text
@@ -138,11 +146,16 @@ def _li(unit_price, quantity="1", vat_rate="8.1", position=1):
 def test_multiple_vat_rates_are_summed_per_rate(client, make_tenant):
     t = make_tenant()
     cid = _client(client, t["headers"])
-    doc = _post(client, t["headers"], cid, [
-        _li("100.00", vat_rate="8.1", position=1),
-        _li("100.00", vat_rate="2.6", position=2),
-        _li("100.00", vat_rate="0", position=3),
-    ])
+    doc = _post(
+        client,
+        t["headers"],
+        cid,
+        [
+            _li("100.00", vat_rate="8.1", position=1),
+            _li("100.00", vat_rate="2.6", position=2),
+            _li("100.00", vat_rate="0", position=3),
+        ],
+    )
     assert Decimal(doc["subtotal"]) == Decimal("300.00")
     assert Decimal(doc["vat_amount"]) == Decimal("8.10") + Decimal("2.60") + Decimal("0.00")
     assert Decimal(doc["total"]) == Decimal("310.70")
@@ -151,11 +164,17 @@ def test_multiple_vat_rates_are_summed_per_rate(client, make_tenant):
 def test_discount_applies_before_vat_on_every_rate(client, make_tenant):
     t = make_tenant()
     cid = _client(client, t["headers"])
-    doc = _post(client, t["headers"], cid, [
-        _li("100.00", vat_rate="8.1", position=1),
-        _li("100.00", vat_rate="2.6", position=2),
-        _li("100.00", vat_rate="0", position=3),
-    ], discount_percent="10")
+    doc = _post(
+        client,
+        t["headers"],
+        cid,
+        [
+            _li("100.00", vat_rate="8.1", position=1),
+            _li("100.00", vat_rate="2.6", position=2),
+            _li("100.00", vat_rate="0", position=3),
+        ],
+        discount_percent="10",
+    )
     assert Decimal(doc["discount_amount"]) == Decimal("30.00")
     # 90 × 8.1 % = 7.29 · 90 × 2.6 % = 2.34 · 0
     assert Decimal(doc["vat_amount"]) == Decimal("9.63")
@@ -262,6 +281,7 @@ def test_two_decimal_quantities_multiply_out_exactly(client, make_tenant):
 
 
 # ── 5-Rappen cash rounding (helper only — not applied to document totals) ──
+
 
 @pytest.mark.parametrize(
     ("amount", "expected"),

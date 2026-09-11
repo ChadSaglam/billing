@@ -67,7 +67,9 @@ def create_client(data: ClientCreate, db: Session = Depends(get_db), tenant_id: 
 
 
 @router.put("/{client_id}", response_model=ClientRead, dependencies=[Depends(require_editor)])
-def update_client(client_id: int, data: ClientUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def update_client(
+    client_id: int, data: ClientUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)
+):
     client = get_or_404(db, Client, client_id, tenant_id)
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(client, key, value)

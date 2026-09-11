@@ -46,9 +46,7 @@ def _build_line_item(item_data, document_id: int, default_vat_rate: Decimal | No
     fields["description"] = sanitize_text(fields.get("description", ""))
     if "vat_rate" not in item_data.model_fields_set and default_vat_rate is not None:
         fields["vat_rate"] = default_vat_rate
-    fields["total_price"] = (
-        Decimal(fields["quantity"]) * Decimal(fields["unit_price"])
-    ).quantize(Decimal("0.01"))
+    fields["total_price"] = (Decimal(fields["quantity"]) * Decimal(fields["unit_price"])).quantize(Decimal("0.01"))
     return LineItem(**fields, document_id=document_id)
 
 
@@ -68,7 +66,9 @@ def _recalc_totals(line_items: list, discount_percent: Decimal) -> tuple[Decimal
     return subtotal, discount_amount, vat_amount, total
 
 
-def _get_doc(db: Session, doc_id: int, tenant_id: int, *, with_items: bool = False, with_client: bool = False) -> Document:
+def _get_doc(
+    db: Session, doc_id: int, tenant_id: int, *, with_items: bool = False, with_client: bool = False
+) -> Document:
     query = scoped(db, Document, tenant_id).filter(Document.id == doc_id)
     if with_items:
         query = query.options(joinedload(Document.line_items))
@@ -117,10 +117,10 @@ def list_documents(
         query = query.filter(Document.client_id == client_id)
     if search:
         from app.models.client import Client
+
         pattern = f"%{search}%"
         query = query.filter(
-            (Document.document_number.ilike(pattern)) |
-            (Document.client.has(Client.company_name.ilike(pattern)))
+            (Document.document_number.ilike(pattern)) | (Document.client.has(Client.company_name.ilike(pattern)))
         )
     query = query.order_by(Document.date.desc(), Document.id.desc())
 
@@ -160,20 +160,40 @@ def export_documents_csv(
 
     buffer = BytesIO()
     import codecs
+
     buffer.write(codecs.BOM_UTF8)
     wrapper = io.TextIOWrapper(buffer, encoding="utf-8", newline="")
 
     writer = csv.writer(wrapper, delimiter=";", quoting=csv.QUOTE_MINIMAL)
-    writer.writerow([
-        "Belegnummer", "Belegdatum", "Fälligkeitsdatum", "Typ",
-        "Status", "Kunde_Nr", "Kunde_Name",
-        "Pos", "Beschreibung", "Menge", "Einheit", "Einzelpreis",
-        "Positionsbetrag_netto", "MWST_Satz_%", "MWST_Betrag",
-        "Positionsbetrag_brutto",
-        "Rabatt_%", "Rabatt_Betrag",
-        "Dokument_Netto", "Dokument_MWST", "Dokument_Total",
-        "Währung", "Bezahlt_am", "Zahlungsart", "Zahlungsreferenz",
-    ])
+    writer.writerow(
+        [
+            "Belegnummer",
+            "Belegdatum",
+            "Fälligkeitsdatum",
+            "Typ",
+            "Status",
+            "Kunde_Nr",
+            "Kunde_Name",
+            "Pos",
+            "Beschreibung",
+            "Menge",
+            "Einheit",
+            "Einzelpreis",
+            "Positionsbetrag_netto",
+            "MWST_Satz_%",
+            "MWST_Betrag",
+            "Positionsbetrag_brutto",
+            "Rabatt_%",
+            "Rabatt_Betrag",
+            "Dokument_Netto",
+            "Dokument_MWST",
+            "Dokument_Total",
+            "Währung",
+            "Bezahlt_am",
+            "Zahlungsart",
+            "Zahlungsreferenz",
+        ]
+    )
 
     for doc in docs:
         client_nr = doc.client.customer_number if doc.client else ""
@@ -181,41 +201,73 @@ def export_documents_csv(
         paid_at_str = doc.paid_at.strftime("%d.%m.%Y") if doc.paid_at else ""
 
         if not doc.line_items:
-            writer.writerow([
-                doc.document_number, doc.date.strftime("%d.%m.%Y"),
-                doc.due_date.strftime("%d.%m.%Y") if doc.due_date else "",
-                doc.document_type, doc.status, client_nr, client_name,
-                "", "", "", "", "",
-                "", "", "",
-                "",
-                f"{doc.discount_percent:.2f}", f"{doc.discount_amount:.2f}",
-                f"{doc.subtotal:.2f}", f"{doc.vat_amount:.2f}", f"{doc.total:.2f}",
-                doc.currency, paid_at_str, doc.payment_method or "", doc.payment_reference or "",
-            ])
+            writer.writerow(
+                [
+                    doc.document_number,
+                    doc.date.strftime("%d.%m.%Y"),
+                    doc.due_date.strftime("%d.%m.%Y") if doc.due_date else "",
+                    doc.document_type,
+                    doc.status,
+                    client_nr,
+                    client_name,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    f"{doc.discount_percent:.2f}",
+                    f"{doc.discount_amount:.2f}",
+                    f"{doc.subtotal:.2f}",
+                    f"{doc.vat_amount:.2f}",
+                    f"{doc.total:.2f}",
+                    doc.currency,
+                    paid_at_str,
+                    doc.payment_method or "",
+                    doc.payment_reference or "",
+                ]
+            )
             continue
 
-        discount_ratio = (
-            (Decimal("1") - doc.discount_percent / Decimal("100"))
-            if doc.subtotal > 0 else Decimal("1")
-        )
+        discount_ratio = (Decimal("1") - doc.discount_percent / Decimal("100")) if doc.subtotal > 0 else Decimal("1")
 
         for item in doc.line_items:
             net = item.total_price
             vat_on_item = (net * discount_ratio * item.vat_rate / Decimal("100")).quantize(Decimal("0.01"))
             gross = (net * discount_ratio + vat_on_item).quantize(Decimal("0.01"))
 
-            writer.writerow([
-                doc.document_number, doc.date.strftime("%d.%m.%Y"),
-                doc.due_date.strftime("%d.%m.%Y") if doc.due_date else "",
-                doc.document_type, doc.status, client_nr, client_name,
-                item.position, item.description, f"{item.quantity:.2f}", item.unit,
-                f"{item.unit_price:.2f}",
-                f"{net:.2f}", f"{item.vat_rate:.2f}", f"{vat_on_item:.2f}",
-                f"{gross:.2f}",
-                f"{doc.discount_percent:.2f}", f"{doc.discount_amount:.2f}",
-                f"{doc.subtotal:.2f}", f"{doc.vat_amount:.2f}", f"{doc.total:.2f}",
-                doc.currency, paid_at_str, doc.payment_method or "", doc.payment_reference or "",
-            ])
+            writer.writerow(
+                [
+                    doc.document_number,
+                    doc.date.strftime("%d.%m.%Y"),
+                    doc.due_date.strftime("%d.%m.%Y") if doc.due_date else "",
+                    doc.document_type,
+                    doc.status,
+                    client_nr,
+                    client_name,
+                    item.position,
+                    item.description,
+                    f"{item.quantity:.2f}",
+                    item.unit,
+                    f"{item.unit_price:.2f}",
+                    f"{net:.2f}",
+                    f"{item.vat_rate:.2f}",
+                    f"{vat_on_item:.2f}",
+                    f"{gross:.2f}",
+                    f"{doc.discount_percent:.2f}",
+                    f"{doc.discount_amount:.2f}",
+                    f"{doc.subtotal:.2f}",
+                    f"{doc.vat_amount:.2f}",
+                    f"{doc.total:.2f}",
+                    doc.currency,
+                    paid_at_str,
+                    doc.payment_method or "",
+                    doc.payment_reference or "",
+                ]
+            )
 
     wrapper.detach()
     buffer.seek(0)
@@ -238,7 +290,9 @@ def get_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int = De
 
 @router.post("", response_model=DocumentRead, status_code=201, dependencies=[Depends(require_editor)])
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
-def create_document(request: Request, data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def create_document(
+    request: Request, data: DocumentCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)
+):
     doc_data = data.model_dump(exclude={"line_items", "document_number"})
     tenant_settings = _get_settings(db, tenant_id)
     # A client that did not send a currency gets the tenant's default, not a
@@ -278,7 +332,9 @@ def create_document(request: Request, data: DocumentCreate, db: Session = Depend
 
 
 @router.put("/{doc_id}", response_model=DocumentRead, dependencies=[Depends(require_editor)])
-def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def update_document(
+    doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)
+):
     doc = _get_doc(db, doc_id, tenant_id)
     update_data = data.model_dump(exclude_unset=True, exclude={"line_items"})
     for key, value in update_data.items():
@@ -354,6 +410,7 @@ def update_document_status(
 
     if data.status == "paid":
         from datetime import date as date_type
+
         doc.paid_at = data.paid_at or date_type.today()
         if data.payment_method:
             doc.payment_method = data.payment_method
@@ -382,10 +439,7 @@ def duplicate_document(
     tenant_id: int = Depends(get_tenant_id),
 ):
     original = (
-        scoped(db, Document, tenant_id)
-        .options(joinedload(Document.line_items))
-        .filter(Document.id == doc_id)
-        .first()
+        scoped(db, Document, tenant_id).options(joinedload(Document.line_items)).filter(Document.id == doc_id).first()
     )
     if not original:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -401,9 +455,7 @@ def duplicate_document(
         date=today,
         # payment_terms_days is nullable — no terms, no derived due date (R-70).
         due_date=(
-            today + dt.timedelta(days=original.payment_terms_days)
-            if original.payment_terms_days is not None
-            else None
+            today + dt.timedelta(days=original.payment_terms_days) if original.payment_terms_days is not None else None
         ),
         payment_terms_days=original.payment_terms_days,
         status="draft",
@@ -420,16 +472,18 @@ def duplicate_document(
     db.flush()
 
     for item in original.line_items:
-        db.add(LineItem(
-            document_id=clone.id,
-            position=item.position,
-            description=item.description,
-            quantity=item.quantity,
-            unit=item.unit,
-            unit_price=item.unit_price,
-            total_price=item.total_price,
-            vat_rate=item.vat_rate,
-        ))
+        db.add(
+            LineItem(
+                document_id=clone.id,
+                position=item.position,
+                description=item.description,
+                quantity=item.quantity,
+                unit=item.unit,
+                unit_price=item.unit_price,
+                total_price=item.total_price,
+                vat_rate=item.vat_rate,
+            )
+        )
 
     db.commit()
     db.refresh(clone)
@@ -579,6 +633,7 @@ def bulk_update_status(
             doc.status = data.status
             if data.status == "paid":
                 from datetime import date as date_type
+
                 doc.paid_at = data.paid_at or date_type.today()
                 doc.payment_method = data.payment_method
                 doc.payment_reference = data.payment_reference
@@ -681,7 +736,9 @@ def send_document_email_endpoint(
 
 @router.post("/bulk/pdf-zip", dependencies=[Depends(require_editor)])
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
-def bulk_download_pdf_zip(request: Request, data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def bulk_download_pdf_zip(
+    request: Request, data: BulkActionRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)
+):
     docs = (
         scoped(db, Document, tenant_id)
         .options(joinedload(Document.line_items), joinedload(Document.client))
@@ -713,6 +770,7 @@ def bulk_download_pdf_zip(request: Request, data: BulkActionRequest, db: Session
 # ── Recurring invoices helper ─────────────────────────
 def _calc_next_recurrence(base_date, recurrence: str):
     from dateutil.relativedelta import relativedelta
+
     deltas = {
         "monthly": relativedelta(months=1),
         "quarterly": relativedelta(months=3),

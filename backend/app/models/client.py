@@ -9,9 +9,7 @@ from app.database import Base
 class Client(Base):
     __tablename__ = "clients"
     # Customer numbers are unique per tenant, not globally (R-04).
-    __table_args__ = (
-        UniqueConstraint("tenant_id", "customer_number", name="uq_clients_tenant_customer_number"),
-    )
+    __table_args__ = (UniqueConstraint("tenant_id", "customer_number", name="uq_clients_tenant_customer_number"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False, index=True)
@@ -26,7 +24,5 @@ class Client(Base):
     country: Mapped[str] = mapped_column(String(100), default="Schweiz")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
-    updated_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow
-    )
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow)
     documents: Mapped[list["Document"]] = relationship(back_populates="client")  # noqa: F821

@@ -45,9 +45,7 @@ class Document(Base):
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
     currency: Mapped[str] = mapped_column(String(3), default="CHF")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    converted_from_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id"), nullable=True
-    )
+    converted_from_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
 
     # Payment tracking
     paid_at: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
@@ -62,9 +60,7 @@ class Document(Base):
     portal_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
-    updated_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow
-    )
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow)
 
     client: Mapped["Client"] = relationship(back_populates="documents")  # noqa: F821
     line_items: Mapped[list["LineItem"]] = relationship(  # noqa: F821

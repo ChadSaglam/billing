@@ -105,9 +105,7 @@ test-backend: dev-deps ## Backend tests only, with coverage (needs DATABASE_URL,
 
 lint: dev-deps ## Lint everything (no writes)
 	cd backend && ../$(PY) -m ruff check app tests
-	@# Same as CI: format drift is reported but not fatal until R-81 makes it strict.
-	@cd backend && ../$(PY) -m ruff format --check app tests \
-		|| echo "  ⚠ ruff format --check found drift (non-fatal, see R-81) — run: make fix"
+	cd backend && ../$(PY) -m ruff format --check app tests
 	cd frontend && npm run lint
 
 fix: dev-deps ## Auto-fix what can be auto-fixed

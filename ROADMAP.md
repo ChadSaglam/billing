@@ -151,8 +151,8 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       seed call. Rewrite Quick Start around `scripts/dev.sh` + `.env.example`. — `M` / `S`
 - [ ] **R-80** `frontend/package.json`: name `frontend-tmp`; `shadcn` CLI in runtime deps; both the
       `radix-ui` meta-package and individual `@radix-ui/*` installed. — `L` / `S`
-- [ ] **R-81** CI hygiene: installs cairo/pango libs that R-18 removed; `ruff format` is
-      `continue-on-error`; model/migration drift check only warns. Make all three strict. — `M` / `S`
+- [ ] **R-81** CI hygiene: installs cairo/pango libs that R-18 removed; model/migration drift
+      check only warns. Make both strict. (`ruff format` strict since 2026-09-11 — tree reformatted.) — `M` / `S`
       `.github/workflows/ci.yml:49-55,68,78`
 - [ ] **R-64** PR template with R-ID + north-star column + test-plan checklist. — `L` / `S`
 - [ ] **R-30** Soft-delete for documents (Swiss retention rules). — `H` / `M`

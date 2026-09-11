@@ -11,9 +11,7 @@ class LineItem(Base):
     __tablename__ = "line_items"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    document_id: Mapped[int] = mapped_column(
-        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
-    )
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("1"))

@@ -45,7 +45,7 @@ def validate_creditor_reference(ref: str) -> bool:
 
 def format_creditor_reference(ref: str) -> str:
     """Format with spaces every 4 chars for display."""
-    return " ".join(ref[i:i + 4] for i in range(0, len(ref), 4))
+    return " ".join(ref[i : i + 4] for i in range(0, len(ref), 4))
 
 
 def mod10_recursive(digits: str) -> int:

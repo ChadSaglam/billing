@@ -13,6 +13,7 @@ Unset `BUCHHALTUNG_API_URL` or `PLATFORM_SHARED_SECRET` = events are still
 recorded (so nothing is lost when the platform is wired up later) but never
 sent; `deliver_pending` returns `{"skipped": n}`.
 """
+
 import datetime as dt
 import hashlib
 import hmac
@@ -197,7 +198,10 @@ def deliver_pending(db: Session, *, now: dt.datetime | None = None) -> dict[str,
                 failed += 1
                 logger.warning(
                     "platform event %s #%s attempt %d failed: %s",
-                    row.event, row.id, row.attempts, row.last_error,
+                    row.event,
+                    row.id,
+                    row.attempts,
+                    row.last_error,
                 )
     if delivered:
         logger.info("platform events: delivered %d", delivered)

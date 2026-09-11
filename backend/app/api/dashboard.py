@@ -14,6 +14,7 @@ from app.services.tenancy import scoped
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
+
 @router.get("", response_model=DashboardStats)
 def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
     rechnung = Document.document_type == "rechnung"
@@ -48,17 +49,17 @@ def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_te
 
     # Monthly revenue (last 12 months)
     twelve_months_ago = dt.date.today().replace(day=1) - dt.timedelta(days=365)
-    month_label = func.to_char(Document.date, 'YYYY-MM')
+    month_label = func.to_char(Document.date, "YYYY-MM")
 
     monthly_rows = (
         db.query(
             month_label.label("month"),
-            func.coalesce(func.sum(
-                case((Document.status == "paid", Document.total), else_=Decimal("0"))
-            ), 0).label("revenue"),
-            func.coalesce(func.sum(
-                case((Document.status.in_(["sent", "overdue"]), Document.total), else_=Decimal("0"))
-            ), 0).label("outstanding"),
+            func.coalesce(func.sum(case((Document.status == "paid", Document.total), else_=Decimal("0"))), 0).label(
+                "revenue"
+            ),
+            func.coalesce(
+                func.sum(case((Document.status.in_(["sent", "overdue"]), Document.total), else_=Decimal("0"))), 0
+            ).label("outstanding"),
         )
         .filter(Document.tenant_id == tenant_id, rechnung, Document.date >= twelve_months_ago)
         .group_by(month_label)
@@ -67,8 +68,7 @@ def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_te
     )
 
     monthly_revenue = [
-        MonthlyRevenue(month=r.month, revenue=r.revenue, outstanding=r.outstanding)
-        for r in monthly_rows
+        MonthlyRevenue(month=r.month, revenue=r.revenue, outstanding=r.outstanding) for r in monthly_rows
     ]
 
     # Status distribution (all document types)
@@ -79,9 +79,7 @@ def get_dashboard(db: Session = Depends(get_db), tenant_id: int = Depends(get_te
         .all()
     )
 
-    status_distribution = [
-        StatusCount(status=r.status, count=r.count) for r in status_rows
-    ]
+    status_distribution = [StatusCount(status=r.status, count=r.count) for r in status_rows]
 
     return DashboardStats(
         total_revenue=total_revenue,

@@ -4,6 +4,7 @@
 flipping the setting and reloading `app.main`; the module is reloaded again
 afterwards so the rest of the suite keeps the development app.
 """
+
 import importlib
 
 import pytest

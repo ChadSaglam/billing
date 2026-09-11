@@ -90,7 +90,9 @@ class S3Storage:
         self.access_key = access_key
         self.secret_key = secret_key
         self.region = region
-        base = public_base_url or (f"{endpoint_url.rstrip('/')}/{bucket}" if endpoint_url else f"https://{bucket}.s3.amazonaws.com")
+        base = public_base_url or (
+            f"{endpoint_url.rstrip('/')}/{bucket}" if endpoint_url else f"https://{bucket}.s3.amazonaws.com"
+        )
         self.public_base_url = base.rstrip("/")
         self._client = client
 

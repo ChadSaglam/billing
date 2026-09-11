@@ -4,6 +4,7 @@ Uses TEST_DATABASE_URL (falls back to DATABASE_URL). Tables are created once
 per session and every test runs inside a rolled-back transaction, so the
 suite never leaves rows behind.
 """
+
 import os
 import pathlib
 import uuid

@@ -135,11 +135,7 @@ def refresh(request: Request, data: RefreshRequest, db: Session = Depends(get_db
     # before this change carry no registered jti and are rejected — those
     # users simply log in again.
     stored = db.query(RefreshToken).filter(RefreshToken.jti == payload.get("jti", "")).first()
-    if (
-        stored is None
-        or stored.revoked_at is not None
-        or stored.expires_at < datetime.now(UTC).replace(tzinfo=None)
-    ):
+    if stored is None or stored.revoked_at is not None or stored.expires_at < datetime.now(UTC).replace(tzinfo=None):
         raise HTTPException(status_code=401, detail="Refresh token revoked or unknown")
 
     user_id = int(payload["sub"])
@@ -164,9 +160,7 @@ def logout(request: Request, data: LogoutRequest, db: Session = Depends(get_db))
     token validity — unknown or already-revoked tokens get the same 204.
     """
     try:
-        payload = jwt.decode(
-            data.refresh_token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM]
-        )
+        payload = jwt.decode(data.refresh_token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
     except (JWTError, ValueError):
         return
     if payload.get("type") != "refresh":
