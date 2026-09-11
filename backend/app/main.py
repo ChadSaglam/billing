@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api import auth, clients, dashboard, documents, portal, services, settings, users
+from app.api import auth, clients, dashboard, documents, portal, services, settings, sso, users
 from app.auth import get_current_user
 from app.config import settings as app_settings
 from app.core.errors import RequestContextMiddleware, install_error_handlers
@@ -19,6 +19,7 @@ from app.core.sentry import configure_sentry
 from app.database import SessionLocal, get_db
 from app.limiter import limiter, rate_limit_exceeded_handler
 from app.models.user import User
+from app.services.events import delivery_health
 from app.services.jobs import background_jobs_loop, run_scheduled_jobs
 
 configure_logging(app_settings.LOG_LEVEL)
@@ -88,6 +89,7 @@ app.include_router(settings.router)
 app.include_router(services.router)
 app.include_router(portal.router)
 app.include_router(users.router)
+app.include_router(sso.router)
 
 LOGOS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
@@ -98,7 +100,8 @@ def health(db: Session = Depends(get_db)):
     """Unauthenticated liveness/readiness probe (CI, compose healthcheck).
 
     Always: status, version, database, migration, storage, jobs. Disk usage
-    is a capacity detail and only reported outside production (R-75).
+    and the outbound-events backlog are operational details and only
+    reported outside production (R-75, R-104).
     """
     health = {
         "status": "ok",
@@ -134,6 +137,13 @@ def health(db: Session = Depends(get_db)):
             }
         except Exception:
             health["disk"] = "unavailable"
+
+        # Outbound platform events (R-104): rows still to be tried and rows
+        # that gave up. Operational detail like `disk`, so non-production only.
+        try:
+            health["events"] = delivery_health(db)
+        except Exception:
+            health["events"] = "unavailable"
 
     return health
 

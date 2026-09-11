@@ -2,7 +2,7 @@
 
 > One running list. Never duplicated — items move between sections, they don't get re-added.
 > Legend: severity `C`ritical / `H`igh / `M`edium / `L`ow · effort `S` (<1h) / `M` (half day) / `L` (multi-day)
-> IDs: `R-xx` = work item (next free: **R-103**) · `P-xx` = parked idea (next free: **P-07**)
+> IDs: `R-xx` = work item (next free: **R-106**) · `P-xx` = parked idea (next free: **P-07**)
 > Cross-product items (SSO, contracts, design tokens) live in `chadev-platform/ROADMAP.md`, not here.
 > Updated: 2026-09-11
 
@@ -22,6 +22,8 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 ---
 
 ## 🔥 NOW — do these in order (one at a time)
+
+> Platform Phase 6.1/6.2 (R-103 SSO, R-104 events) shipped 2026-09-11 — see Done. Next platform item: R-105.
 
 - [ ] **R-96** Drop the legacy top-level `detail` from error responses in **2.6.0** (contract:
       chadev-platform/contracts/errors.md). No first-party reader left after R-94; flag in release notes. — `M` / `S`
@@ -122,6 +124,13 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       `backend/app/api/portal.py` · `frontend/src/pages/Portal.tsx`
 - [ ] **R-29** Status history (JSONB, migration `f7978eefd0b8`) surfaced as a timeline in DocumentDetail. — `L` / `M`
 
+### Platform (cross-product, billing side)
+
+- [ ] **R-105** `invoice.unpaid` reversal event: status set back from `paid` (single + bulk) emits a
+      reversal so buchhaltung can storno the booking created from `invoice.paid`. Parked from the
+      events contract v1 (buchhaltung side: B-36). Needs a `version` bump decision first. — `M` / `M`
+      `backend/app/services/events.py` · `backend/app/api/documents.py`
+
 ### Testing & reliability
 
 - [ ] **R-100** Playwright: portal (public token link) and multi-tenant isolation specs on top of
@@ -160,6 +169,21 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-104** ✅ 2026-09-11 — Outbound platform events (contracts/events.md): `outbound_events` outbox
+  (migration `e3f4a5b6c7d8`, model `OutboundEvent`), `services/events.py` with `emit()` (same transaction as
+  the business change) and `deliver_pending()` (HMAC-SHA256 `sha256=` over `"{ts}.{body}"`, httpx 10 s,
+  backoff 1 m/5 m/30 m/2 h/24 h, 6 attempts, 404 `unknown_tenant` final, 200/202 delivered, unconfigured =
+  skipped). `invoice.paid` emitted on the rechnung → paid transition (single + bulk; re-saving a paid invoice
+  does not re-emit), one immediate background attempt after the change, retries from the scheduled-jobs
+  pass (`python -m app.jobs` and in-API). `/api/health` gains `events: {pending, failed}` outside production.
+  Tests 126 → **156** (with R-103). Reversal parked as R-105.
+- **R-103** ✅ 2026-09-11 — SSO hand-off, issuer side (contracts/sso.md, ADR-001): `GET /api/sso/launch?app=…`
+  mints the 120 s HS256 SSO token (`iss/aud/type/sub/email/name/tid/role/tenant/iat/exp/jti`) with
+  `PLATFORM_SHARED_SECRET` and returns `<BUCHHALTUNG_URL>/sso#token=…`; `GET /api/sso/apps` feeds the new
+  top-bar `AppSwitcher` (hidden when the list is empty, labelled for the axe gate, DE/EN). 404 envelope when
+  unconfigured or app unknown; 30/min per IP. Settings `PLATFORM_SHARED_SECRET`, `BUCHHALTUNG_URL`,
+  `BUCHHALTUNG_API_URL` (+ compose pass-through, `host.docker.internal` on backend/jobs). README "Platform".
+  vitest 41 → **48**.
 - **R-23** ✅ 2026-09-11 — a11y pass: skip-to-content link, `<main id="main-content">`, nav landmarks with
   `aria-current`; every icon-only button labelled, decorative icons `aria-hidden`; every input has a `<label>`
   (`FormField` generates ids); tables carry `aria-label`, clickable rows expose a real `<Link>`; controlled
@@ -257,6 +281,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 | 2 | Security & data protection | core done, R-83 step 1 + R-92b + R-75 ✅; open: R-15b, R-83b, R-53, R-65, R-76, R-55, R-56 |
 | 3 | Performance | R-84 ✅; open: R-26, R-58, R-82, R-59 |
 | 4 | UX / a11y / frontend | R-25, R-24, R-23 ✅ (2026-09-11); open: R-101, R-102, R-60, R-62, R-61, R-88, R-29 |
+| 6.1/6.2 | Platform: SSO + events (billing side) | ✅ R-103, R-104 (2026-09-11); open: R-105 |
 | 5 | Testing & reliability | R-21, R-22, R-49, R-51 ✅, axe e2e (R-23) ✅; open: R-52, R-57, R-98, R-99, R-100 |
 | 6 | DX & tooling | CI/docker/scripts done; open: R-78, R-79, R-80, R-81, R-63, R-64, R-30 |
 | 4b | Observability | ✅ R-92, R-75, R-84 |

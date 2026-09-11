@@ -268,6 +268,8 @@ billing/
 | POST   | `/api/settings/logo`     | Upload company logo file   |
 | GET    | `/api/health`            | Health check               |
 | POST   | `/api/seed`              | Seed sample data           |
+| GET    | `/api/sso/apps`          | Platform apps for the switcher (R-103) |
+| GET    | `/api/sso/launch?app=…`  | Mint SSO token, return hand-off URL |
 
 ## Document Workflow
 
@@ -330,6 +332,38 @@ cd backend && python -m app.jobs --once
 # or in Docker
 docker compose run --rm jobs python -m app.jobs --once
 ```
+
+## Platform (SSO + events)
+
+billing is product 1 of 2 in the ChaDev platform and the **identity issuer**
+(chadev-platform/docs/ADR-001-sso.md). Two integrations with buchhaltung,
+both off until the platform variables are set:
+
+- **SSO hand-off (R-103, contracts/sso.md).** `GET /api/sso/apps` lists the
+  products the top-bar app switcher may show (empty when unconfigured).
+  `GET /api/sso/launch?app=buchhaltung` mints a 120 s single-use HS256 token
+  (`iss=billing`, `aud=buchhaltung`, `type=sso`, user + tenant snapshot) signed
+  with `PLATFORM_SHARED_SECRET` and returns `{"url": "<BUCHHALTUNG_URL>/sso#token=…"}`;
+  the browser navigates there and buchhaltung exchanges the fragment for its
+  own session. Unconfigured = both routes answer 404.
+- **Outbound events (R-104, contracts/events.md).** When a Rechnung
+  transitions to `paid`, an `invoice.paid` row is written to the durable
+  `outbound_events` table in the same transaction. Delivery is
+  `POST <BUCHHALTUNG_API_URL>/api/platform/events`, HMAC-SHA256 signed
+  (`X-Platform-Signature`, `X-Platform-Timestamp`, `X-Platform-Delivery`),
+  attempted once right after the change and then by the scheduled-jobs pass
+  with backoff 1 min → 5 → 30 → 2 h → 24 h (6 attempts; a 404 `unknown_tenant`
+  is final). `/api/health` shows `"events": {"pending", "failed"}` outside
+  production. Unconfigured = events are recorded but never sent.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `PLATFORM_SHARED_SECRET` | | same value in both `.env` files; signs SSO tokens + event HMAC; separate from `SECRET_KEY` |
+| `BUCHHALTUNG_URL` | `http://localhost:3000` (compose) | browser-facing buchhaltung URL: switcher target + SSO redirect base |
+| `BUCHHALTUNG_API_URL` | `http://host.docker.internal:8000` (compose) | server-to-server base for events; `http://localhost:8000` when uvicorn runs on the host |
+
+`docker-compose.yml` maps `host.docker.internal` to the host gateway on
+`backend` and `jobs`, so the default API URL resolves on Linux as well.
 
 ## Deployment
 

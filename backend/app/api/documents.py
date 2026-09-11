@@ -26,6 +26,7 @@ from app.schemas.document import (
     DocumentUpdate,
     StatusUpdate,
 )
+from app.services.events import deliver_pending_once, emit_invoice_paid
 from app.services.number_generator import generate_document_number
 from app.services.pdf_generator import generate_invoice_pdf
 from app.services.sanitizer import sanitize_text
@@ -326,9 +327,21 @@ def delete_document(doc_id: int, db: Session = Depends(get_db), tenant_id: int =
 
 
 # ── Status + Payment ──────────────────────────────────
+def _becomes_paid(doc: Document, new_status: str) -> bool:
+    """True only on the rechnung → paid *transition* (R-104): re-saving an
+    invoice that is already paid must not emit a second `invoice.paid`."""
+    return doc.document_type == "rechnung" and new_status == "paid" and doc.status != "paid"
+
+
 @router.patch("/{doc_id}/status", response_model=DocumentRead, dependencies=[Depends(require_editor)])
-def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    doc = _get_doc(db, doc_id, tenant_id)
+def update_document_status(
+    doc_id: int,
+    data: StatusUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    doc = _get_doc(db, doc_id, tenant_id, with_client=True)
     valid_statuses = {
         "offerte": {"draft", "sent", "accepted", "rejected", "cancelled"},
         "rechnung": {"draft", "sent", "paid", "overdue", "cancelled"},
@@ -336,6 +349,7 @@ def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depend
     if data.status not in valid_statuses.get(doc.document_type, set()):
         raise HTTPException(status_code=400, detail=f"Invalid status '{data.status}' for {doc.document_type}")
 
+    emit_paid = _becomes_paid(doc, data.status)
     doc.status = data.status
 
     if data.status == "paid":
@@ -350,7 +364,14 @@ def update_document_status(doc_id: int, data: StatusUpdate, db: Session = Depend
         doc.payment_method = None
         doc.payment_reference = None
 
+    if emit_paid:
+        # Same transaction as the status change (outbox pattern); the
+        # background attempt below is a courtesy for local dev — the jobs
+        # runner retries the row with backoff regardless.
+        emit_invoice_paid(db, doc)
     db.commit()
+    if emit_paid:
+        background_tasks.add_task(deliver_pending_once)
     return _load_full(db, doc.id, tenant_id)
 
 
@@ -530,27 +551,45 @@ def preview_pdf(
 # ── Bulk Actions ──────────────────────────────────────
 @router.post("/bulk/status", dependencies=[Depends(require_editor)])
 @limiter.limit(TENANT_LIMIT, key_func=tenant_or_ip_key)
-def bulk_update_status(request: Request, data: BulkStatusRequest, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
-    docs = scoped(db, Document, tenant_id).filter(Document.id.in_(data.document_ids)).all()
+def bulk_update_status(
+    request: Request,
+    data: BulkStatusRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+):
+    docs = (
+        scoped(db, Document, tenant_id)
+        .filter(Document.id.in_(data.document_ids))
+        .options(joinedload(Document.client))
+        .all()
+    )
     if not docs:
         raise HTTPException(status_code=404, detail="No documents found")
 
     updated = 0
+    emitted = 0
     for doc in docs:
         valid = {
             "offerte": {"draft", "sent", "accepted", "rejected", "cancelled"},
             "rechnung": {"draft", "sent", "paid", "overdue", "cancelled"},
         }
         if data.status in valid.get(doc.document_type, set()):
+            emit_paid = _becomes_paid(doc, data.status)
             doc.status = data.status
             if data.status == "paid":
                 from datetime import date as date_type
                 doc.paid_at = data.paid_at or date_type.today()
                 doc.payment_method = data.payment_method
                 doc.payment_reference = data.payment_reference
+            if emit_paid:
+                emit_invoice_paid(db, doc)
+                emitted += 1
             updated += 1
 
     db.commit()
+    if emitted:
+        background_tasks.add_task(deliver_pending_once)
     return {"updated": updated, "total": len(data.document_ids)}
 
 

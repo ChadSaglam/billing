@@ -1,4 +1,4 @@
-"""Scheduled jobs: overdue marking and recurring invoices.
+"""Scheduled jobs: overdue marking, recurring invoices, outbound events.
 
 One pass = `run_scheduled_jobs()`. It is called from two places:
 
@@ -33,6 +33,7 @@ def run_scheduled_jobs(db: Session, source: str) -> None:
     elects a single runner database-wide; everyone else skips this pass.
     On non-Postgres databases (none today) it simply runs unlocked.
     """
+    from app.services.events import deliver_pending
     from app.services.overdue_checker import mark_overdue_invoices
     from app.services.recurring_invoices import process_recurring_invoices
 
@@ -51,6 +52,14 @@ def run_scheduled_jobs(db: Session, source: str) -> None:
         created = process_recurring_invoices(db)
         if created:
             logger.info("[%s] Created %d recurring invoices", source, created)
+
+        # Platform events outbox (R-104): retries with backoff live here, so
+        # `python -m app.jobs` and the in-API loop both deliver.
+        events = deliver_pending(db)
+        if events["delivered"] or events["failed"]:
+            logger.info(
+                "[%s] Platform events: %d delivered, %d failed", source, events["delivered"], events["failed"]
+            )
     finally:
         if locked:
             db.execute(
