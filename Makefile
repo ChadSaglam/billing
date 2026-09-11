@@ -97,8 +97,8 @@ test: test-backend test-unit test-e2e ## Backend tests + frontend unit + e2e
 test-unit: ## Frontend unit tests only (vitest, pure helpers)
 	cd frontend && npm run test
 
-test-e2e: e2e-deps ## Frontend end-to-end tests only (Playwright, needs the API on E2E_API_URL)
-	cd frontend && npx playwright test
+test-e2e: e2e-deps ## End-to-end tests (Playwright); starts a throw-away API on :9100 with db billing_e2e
+	./scripts/e2e.sh
 
 test-backend: dev-deps ## Backend tests only, with coverage (needs DATABASE_URL, see top of file)
 	cd backend && ../$(PY) -m pytest --cov=app --cov-report=term-missing
