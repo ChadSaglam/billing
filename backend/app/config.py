@@ -2,6 +2,7 @@ import json
 from functools import cached_property
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -76,6 +77,25 @@ class Settings(BaseSettings):
     # separate `python -m app.jobs` service instead.
     RUN_JOBS_IN_API: bool = True
     JOBS_INTERVAL_SECONDS: int = 3600
+
+    # ChaDev platform (R-103 SSO, R-104 events). The shared secret signs the
+    # SSO hand-off token and the HMAC on outbound events; it is deliberately
+    # separate from SECRET_KEY (ADR-001 amendment). Unset = SSO endpoints
+    # answer 404 and events are recorded but never sent. Never log it.
+    PLATFORM_SHARED_SECRET: str | None = None
+    # Browser-facing buchhaltung URL: app-switcher target + SSO redirect base.
+    BUCHHALTUNG_URL: str | None = None
+    # Server-to-server buchhaltung API base for platform events
+    # (contracts/events.md); in Docker `http://host.docker.internal:8000`.
+    BUCHHALTUNG_API_URL: str | None = None
+
+    @field_validator("PLATFORM_SHARED_SECRET", "BUCHHALTUNG_URL", "BUCHHALTUNG_API_URL", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, value: object) -> object:
+        # `.env.example` ships the keys empty; an empty string means "off".
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @cached_property
     def allowed_origins(self) -> list[str]:

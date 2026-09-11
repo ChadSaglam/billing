@@ -27,6 +27,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { AppSwitcher } from '@/components/AppSwitcher';
 import CommandPalette from './shared/CommandPalette';
 
 const navItems: { to: string; label: TKey; icon: typeof LayoutDashboard }[] = [
@@ -234,6 +235,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex-1" />
 
             <LanguageSwitcher className="hidden sm:flex" />
+
+            {/* Platform app switcher (R-103) — hidden when SSO is not configured */}
+            <AppSwitcher />
 
             {/* Notifications */}
             <Tooltip>

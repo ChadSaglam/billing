@@ -420,6 +420,40 @@ export const removeUser = async (id: number): Promise<void> => {
   await api.delete(`/api/users/${id}`);
 };
 
+// ── Platform SSO (R-103) ─────────────────────────────
+// billing is the identity issuer: `/api/sso/apps` lists the products the
+// switcher may show (empty when the platform is not configured) and
+// `/api/sso/launch` mints a 120 s token and returns the URL to navigate to.
+export interface SsoApp {
+  id: string;
+  name: string;
+  url: string;
+}
+
+/** Minimal slice of the axios instance the SSO helpers need (testable). */
+export type SsoHttp = { get<T>(url: string, config?: { params?: Record<string, string> }): Promise<{ data: T }> };
+
+export const getSsoApps = async (http: SsoHttp = api): Promise<SsoApp[]> => {
+  const { data } = await http.get<SsoApp[]>('/api/sso/apps');
+  return Array.isArray(data) ? data : [];
+};
+
+export const launchSsoApp = async (appId: string, http: SsoHttp = api): Promise<string> => {
+  const { data } = await http.get<{ url: string }>('/api/sso/launch', { params: { app: appId } });
+  if (!data?.url) throw new Error('SSO launch returned no url');
+  return data.url;
+};
+
+/** Mint the token and hand the browser over. The token lives in the URL
+ *  fragment, so it is never sent to a server or written to a log. */
+export const openSsoApp = async (
+  appId: string,
+  http: SsoHttp = api,
+  navigate: (url: string) => void = (url) => window.location.assign(url),
+): Promise<void> => {
+  navigate(await launchSsoApp(appId, http));
+};
+
 // ── Onboarding ───────────────────────────────────────
 export const completeOnboarding = async (): Promise<void> => {
   await api.post('/api/settings/onboarding-complete');

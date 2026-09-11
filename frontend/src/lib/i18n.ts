@@ -88,6 +88,10 @@ const de = {
   'nav.userMenu': 'Benutzermenü',
   'nav.mainNavigation': 'Hauptnavigation',
   'nav.switchLanguage': 'Sprache wechseln',
+  'nav.apps': 'Apps',
+  'nav.appsMenu': 'Apps wechseln',
+  'nav.openApp': '{name} öffnen',
+  'nav.appLaunchFailed': 'Die App konnte nicht geöffnet werden',
 
   // Command palette
   'cmd.placeholder': 'Befehle, Kunden, Dokumente suchen…',
@@ -555,6 +559,10 @@ const en: Partial<Record<TKey, string>> = {
   'nav.userMenu': 'User menu',
   'nav.mainNavigation': 'Main navigation',
   'nav.switchLanguage': 'Switch language',
+  'nav.apps': 'Apps',
+  'nav.appsMenu': 'Switch app',
+  'nav.openApp': 'Open {name}',
+  'nav.appLaunchFailed': 'The app could not be opened',
 
   'cmd.placeholder': 'Search commands, clients, documents…',
   'cmd.noResults': 'No results found',

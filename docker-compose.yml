@@ -35,6 +35,14 @@ services:
       APP_ENV: ${APP_ENV:-development}
       # The `jobs` service below is the single job runner in Docker (R-84).
       RUN_JOBS_IN_API: "false"
+      # ChaDev platform (R-103 SSO, R-104 events). buchhaltung runs on the
+      # host (3000 / 8000); host.docker.internal is mapped below so the
+      # server-to-server URL resolves on Linux too.
+      PLATFORM_SHARED_SECRET: ${PLATFORM_SHARED_SECRET:-}
+      BUCHHALTUNG_URL: ${BUCHHALTUNG_URL:-http://localhost:3000}
+      BUCHHALTUNG_API_URL: ${BUCHHALTUNG_API_URL:-http://host.docker.internal:8000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - uploads:/app/uploads
@@ -64,6 +72,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-chadev}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-billing}
       APP_ENV: ${APP_ENV:-development}
       JOBS_INTERVAL_SECONDS: ${JOBS_INTERVAL_SECONDS:-3600}
+      # Outbound platform events are delivered by this runner (R-104).
+      PLATFORM_SHARED_SECRET: ${PLATFORM_SHARED_SECRET:-}
+      BUCHHALTUNG_URL: ${BUCHHALTUNG_URL:-http://localhost:3000}
+      BUCHHALTUNG_API_URL: ${BUCHHALTUNG_API_URL:-http://host.docker.internal:8000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
 

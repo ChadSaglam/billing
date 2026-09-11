@@ -23,4 +23,7 @@ export const queryKeys = {
     all: ['team'] as const,
     list: () => ['team', 'list'] as const,
   },
+  sso: {
+    apps: ['sso', 'apps'] as const,
+  },
 } as const;
