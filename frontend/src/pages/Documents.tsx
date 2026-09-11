@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PageHeader, StatusBadge, EmptyState, TableSkeleton } from '@/components/shared';
+import { PageHeader, StatusBadge, EmptyState, ErrorState, TableSkeleton } from '@/components/shared';
 
 const PAGE_SIZE = 25;
 
@@ -36,7 +36,7 @@ export default function Documents() {
 
   // Page is appended to the key the factory returns so every page gets its
   // own cache entry (R-13).
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: [...queryKeys.documents.list({ type: typeParam, status: statusParam, search }), page],
     queryFn: () =>
       getDocumentsPage({
@@ -196,6 +196,8 @@ export default function Documents() {
       {/* Table */}
       {isLoading ? (
         <TableSkeleton />
+      ) : isError ? (
+        <ErrorState error={error} fallback={t('documents.loadFailed')} onRetry={() => refetch()} />
       ) : !documents?.length ? (
         <EmptyState
           preset="documents"

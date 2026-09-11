@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHeader } from '@/components/shared';
+import { PageHeader, ErrorState, PageSkeleton } from '@/components/shared';
 import { DocumentDetailsCard } from '@/components/documents/DocumentDetailsCard';
 import { LineItemsEditor } from '@/components/documents/LineItemsEditor';
 import { emptyLineItem } from '@/components/documents/line-item-utils';
@@ -36,7 +36,7 @@ export default function DocumentForm() {
   const [notes, setNotes] = useState('');
   const [lineItems, setLineItems] = useState<LineItemFormData[]>([emptyLineItem(1)]);
 
-  const { data: existingDoc } = useQuery({
+  const { data: existingDoc, isLoading: docLoading, isError: docError, error: docErr, refetch } = useQuery({
     queryKey: queryKeys.documents.detail(id!),
     queryFn: () => getDocument(Number(id)),
     enabled: isEdit,
@@ -113,6 +113,12 @@ export default function DocumentForm() {
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+
+  // R-24: in edit mode the form used to render empty and fill in later.
+  if (isEdit && docLoading) return <PageSkeleton variant="form" />;
+  if (isEdit && docError) {
+    return <ErrorState error={docErr} fallback={t('docForm.loadFailed')} onRetry={() => refetch()} />;
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">

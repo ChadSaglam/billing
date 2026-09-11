@@ -12,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ConfirmDialog } from '@/components/shared';
+import { ConfirmDialog, EmptyState, ErrorState, PageSkeleton } from '@/components/shared';
 import { UserPlus, Trash2, Copy, Shield, Pencil, Eye } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -35,7 +35,7 @@ export function TeamTab() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   const { data: me } = useQuery({ queryKey: ['auth', 'me'], queryFn: getMe });
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['team', 'list'],
     queryFn: getTeamUsers,
   });
@@ -99,11 +99,11 @@ export function TeamTab() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
-            ))}
-          </div>
+          <PageSkeleton variant="cards" rows={3} header={false} />
+        ) : isError ? (
+          <ErrorState variant="inline" error={error} fallback={t('team.loadFailed')} onRetry={() => refetch()} />
+        ) : users.length === 0 ? (
+          <EmptyState preset="clients" title={t('team.none')} description={t('team.noneDesc')} />
         ) : (
           <div className="space-y-2">
             {users.map((user) => {

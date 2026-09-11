@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { PageHeader, EmptyState, TableSkeleton, ConfirmDialog } from "@/components/shared";
+import { PageHeader, EmptyState, ErrorState, TableSkeleton, ConfirmDialog } from "@/components/shared";
 import { ClientFormDialog, EMPTY_CLIENT } from "@/components/clients/ClientFormDialog";
 
 const PAGE_SIZE = 25;
@@ -31,7 +31,7 @@ export default function Clients() {
 
   // Page is appended to the key the factory returns so every page gets its
   // own cache entry (R-13).
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: [...queryKeys.clients.list(search || undefined), page],
     queryFn: () => getClientsPage(search || undefined, page, PAGE_SIZE),
   });
@@ -137,11 +137,13 @@ export default function Clients() {
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={6} />
+      ) : isError ? (
+        <ErrorState error={error} fallback={t("clients.loadFailed")} onRetry={() => refetch()} />
       ) : clients && clients.length > 0 ? (
         <>
           {/* Desktop table */}
           <div className="hidden md:block">
-            <Table>
+            <Table aria-label={t("clients.tableLabel")}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("field.customerNumberShort")}</TableHead>

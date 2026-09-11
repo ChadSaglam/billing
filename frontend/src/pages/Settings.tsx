@@ -8,9 +8,8 @@ import { useT } from '@/lib/i18n';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageHeader } from '@/components/shared';
+import { PageHeader, ErrorState, PageSkeleton } from '@/components/shared';
 import { CompanyInfoTab } from '@/components/settings/CompanyInfoTab';
 import { BankDetailsTab } from '@/components/settings/BankDetailsTab';
 import { DefaultsTab } from '@/components/settings/DefaultsTab';
@@ -24,7 +23,7 @@ export default function Settings() {
   const [form, setForm] = useState<Partial<CompanySettings>>({});
   const [serviceManagerOpen, setServiceManagerOpen] = useState(false);
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.settings.all,
     queryFn: getSettings,
   });
@@ -51,11 +50,11 @@ export default function Settings() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (isLoading) {
+  if (isLoading) return <div className="p-6 max-w-4xl"><PageSkeleton variant="settings" /></div>;
+  if (isError) {
     return (
-      <div className="space-y-4 p-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full" />
+      <div className="p-6 max-w-4xl">
+        <ErrorState error={error} fallback={t('settings.loadFailed')} onRetry={() => refetch()} />
       </div>
     );
   }

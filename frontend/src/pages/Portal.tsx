@@ -2,12 +2,12 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Download, FileText } from 'lucide-react';
 import { getPortalDocument, downloadPortalPdf } from '@/lib/api';
+import { getApiErrorStatus } from '@/lib/errors';
 import { formatCurrency, formatDate, toNum } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { StatusBadge } from '@/components/shared';
+import { StatusBadge, ErrorState, PageSkeleton } from '@/components/shared';
 import type { LineItem } from '@/types';
 import { useT } from '@/lib/i18n';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -16,7 +16,7 @@ export default function Portal() {
   const { token } = useParams<{ token: string }>();
   const { t } = useT();
 
-  const { data: doc, isLoading, isError } = useQuery({
+  const { data: doc, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['portal', token],
     queryFn: () => getPortalDocument(token!),
     enabled: !!token,
@@ -25,9 +25,21 @@ export default function Portal() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-3xl space-y-4">
-          <Skeleton className="h-12 w-64" />
-          <Skeleton className="h-64" />
+        <div className="w-full max-w-3xl">
+          <PageSkeleton variant="detail" />
+        </div>
+      </div>
+    );
+  }
+
+  // 404 = expired/invalid link (a dead end, no retry); anything else is a
+  // transient failure the reader can retry.
+  const status = getApiErrorStatus(error);
+  if (isError && status !== 404) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <ErrorState error={error} fallback={t('portal.loadFailed')} onRetry={() => refetch()} />
         </div>
       </div>
     );

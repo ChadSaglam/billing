@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -29,7 +28,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { StatusBadge, ConfirmDialog, EmptyState } from '@/components/shared';
+import { StatusBadge, ConfirmDialog, EmptyState, ErrorState, PageSkeleton } from '@/components/shared';
 import PreviewPanel from '@/components/PreviewPanel';
 
 export default function DocumentDetail() {
@@ -45,7 +44,7 @@ export default function DocumentDetail() {
   const [paymentRef, setPaymentRef] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const { data: doc, isLoading } = useQuery({
+  const { data: doc, isLoading, isError, error, refetch } = useQuery({
     queryKey: queryKeys.documents.detail(id!),
     queryFn: () => getDocument(Number(id)),
     enabled: !!id,
@@ -159,19 +158,22 @@ export default function DocumentDetail() {
     return () => window.removeEventListener('keydown', handler);
   }, [doc, previewOpen, deleteOpen, convertOpen, paymentOpen, navigate, id, queryClient, invalidate, t]);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}
-        </div>
-        <Skeleton className="h-64" />
-      </div>
-    );
+  if (isLoading) return <PageSkeleton variant="detail" />;
+
+  if (isError) {
+    return <ErrorState error={error} fallback={t('docDetail.loadFailed')} onRetry={() => refetch()} />;
   }
 
-  if (!doc) return <EmptyState icon={FileText} title={t('docDetail.notFound')} />;
+  if (!doc) {
+    return (
+      <EmptyState
+        icon={FileText}
+        title={t('docDetail.notFound')}
+        description={t('docDetail.notFoundDesc')}
+        action={<Button variant="outline" onClick={() => navigate('/documents')}>{t('docDetail.backToDocuments')}</Button>}
+      />
+    );
+  }
 
   const isOfferte = doc.document_type === 'offerte';
   const isRechnung = doc.document_type === 'rechnung';

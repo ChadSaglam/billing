@@ -4,6 +4,7 @@ import { isAuthenticated } from '@/lib/auth';
 import { getSettings } from '@/lib/api';
 import type { CompanySettings } from '@/types';
 import Layout from '@/components/Layout';
+import { PageSkeleton, ErrorState } from '@/components/shared';
 import Dashboard from '@/pages/Dashboard';
 import Clients from '@/pages/Clients';
 import ClientDetail from '@/pages/ClientDetail';
@@ -23,14 +24,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { data: settings, isLoading, isFetching } = useQuery({
+  const { data: settings, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['settings'],
     queryFn: getSettings,
     enabled: isAuthenticated(),
     retry: false,
   });
 
-  if (isLoading || isFetching) return null;
+  // R-24: no blank screen while the gate decides. `isLoading` only covers
+  // the first fetch, so a background refetch (e.g. after saving settings)
+  // no longer unmounts the page tree.
+  if (isLoading) return <div className="p-8"><PageSkeleton variant="dashboard" /></div>;
+  if (isError) return <div className="p-8"><ErrorState error={error} onRetry={() => refetch()} /></div>;
 
   if (settings && !(settings as CompanySettings & { onboarding_completed?: boolean }).onboarding_completed) {
     return <Navigate to="/onboarding" replace />;

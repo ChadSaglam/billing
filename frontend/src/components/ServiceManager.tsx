@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState, ErrorState, TableSkeleton } from '@/components/shared';
 import {
   Table,
   TableBody,
@@ -56,7 +57,7 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
   const [editingService, setEditingService] = useState<ServiceTemplate | null>(null);
   const [form, setForm] = useState<CreateServicePayload>(emptyService);
 
-  const { data: services } = useQuery({
+  const { data: services, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['services'],
     queryFn: getServices,
   });
@@ -160,9 +161,13 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
             </Button>
           </div>
 
-          {services && services.length > 0 ? (
+          {isLoading ? (
+            <TableSkeleton rows={4} columns={6} />
+          ) : isError ? (
+            <ErrorState variant="inline" error={error} fallback={t('services.loadFailed')} onRetry={() => refetch()} />
+          ) : services && services.length > 0 ? (
             <div className="rounded-lg border">
-              <Table>
+              <Table aria-label={t('services.tableLabel')}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('services.name')}</TableHead>
@@ -209,9 +214,16 @@ export function ServiceManager({ open, onOpenChange }: ServiceManagerProps) {
               </Table>
             </div>
           ) : (
-            <div className="py-8 text-center text-muted-foreground">
-              <p>{t('services.none')}. {t('services.noneDesc')}</p>
-            </div>
+            <EmptyState
+              title={t('services.none')}
+              description={t('services.noneDesc')}
+              action={
+                <Button size="sm" onClick={openCreate}>
+                  <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t('services.add')}
+                </Button>
+              }
+            />
           )}
         </DialogContent>
       </Dialog>

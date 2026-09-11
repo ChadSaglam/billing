@@ -11,12 +11,11 @@ import { useT } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { PageHeader, StatusBadge, TableSkeleton, EmptyState } from "@/components/shared";
+import { PageHeader, StatusBadge, TableSkeleton, EmptyState, ErrorState, PageSkeleton } from "@/components/shared";
 import { ClientFormDialog, EMPTY_CLIENT } from "@/components/clients/ClientFormDialog";
 
 export default function ClientDetail() {
@@ -27,13 +26,13 @@ export default function ClientDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState<CreateClientPayload>(EMPTY_CLIENT);
 
-  const { data: client, isLoading: clientLoading } = useQuery({
+  const { data: client, isLoading: clientLoading, isError: clientError, error: clientErr, refetch: refetchClient } = useQuery({
     queryKey: queryKeys.clients.detail(id!),
     queryFn: () => getClient(Number(id)),
     enabled: !!id,
   });
 
-  const { data: documents, isLoading: docsLoading } = useQuery({
+  const { data: documents, isLoading: docsLoading, isError: docsError, error: docsErr, refetch: refetchDocs } = useQuery({
     queryKey: queryKeys.documents.list({ type: undefined, status: undefined, search: undefined }),
     queryFn: () => getDocuments({ client_id: Number(id) }),
     enabled: !!id,
@@ -89,9 +88,10 @@ export default function ClientDetail() {
   const renderDocumentsTable = (type?: string) => {
     const filtered = filterDocs(type);
     if (docsLoading) return <TableSkeleton rows={3} columns={5} />;
+    if (docsError) return <ErrorState variant="inline" error={docsErr} fallback={t("clients.documentsLoadFailed")} onRetry={() => refetchDocs()} />;
     if (filtered.length === 0) return <EmptyState preset="documents" title={t("clients.noDocuments")} description={t("clients.noDocumentsDesc")} />;
     return (
-      <Table>
+      <Table aria-label={t("clients.documents")}>
         <TableHeader>
           <TableRow>
             <TableHead>{t("common.number")}</TableHead>
@@ -118,14 +118,10 @@ export default function ClientDetail() {
     );
   };
 
-  if (clientLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (clientLoading) return <PageSkeleton variant="detail" />;
+
+  if (clientError) {
+    return <ErrorState error={clientErr} fallback={t("clients.clientLoadFailed")} onRetry={() => refetchClient()} />;
   }
 
   if (!client) {
