@@ -2,9 +2,9 @@
 
 > One running list. Never duplicated — items move between sections, they don't get re-added.
 > Legend: severity `C`ritical / `H`igh / `M`edium / `L`ow · effort `S` (<1h) / `M` (half day) / `L` (multi-day)
-> IDs: `R-xx` = work item (next free: **R-101**) · `P-xx` = parked idea (next free: **P-07**)
+> IDs: `R-xx` = work item (next free: **R-103**) · `P-xx` = parked idea (next free: **P-07**)
 > Cross-product items (SSO, contracts, design tokens) live in `chadev-platform/ROADMAP.md`, not here.
-> Updated: 2026-09-10
+> Updated: 2026-09-11
 
 ---
 
@@ -26,6 +26,14 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 - [ ] **R-96** Drop the legacy top-level `detail` from error responses in **2.6.0** (contract:
       chadev-platform/contracts/errors.md). No first-party reader left after R-94; flag in release notes. — `M` / `S`
       `backend/app/core/errors.py` · `backend/app/limiter.py`
+- [ ] **R-101** PDF / email language per document (DE/EN). The UI is bilingual since R-25; the PDF
+      labels (`pdf_generator.py`) and the email templates are still German only. Add `language` to
+      `documents` (default from the tenant), pass it into the template style pack from R-47. — `M` / `M`
+      `backend/app/services/pdf_generator.py` · `backend/app/models/document.py`
+- [ ] **R-102** Dark-mode brand text contrast: `--cd-color-brand` dark `#3b6cf6` on `--cd-color-bg`
+      `#0b0f19` is 4.25:1 (links / `text-primary`), just under AA 4.5:1; white on it is 4.50:1 so buttons
+      pass. Decide in the platform tokens (lighter dark brand, or use `--cd-color-brand-hover` for
+      text). — `L` / `S` · `chadev-platform/tokens/tokens.css`
 
 ---
 
@@ -37,7 +45,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
       status+convert / pdf+email / bulk+export. — `H` / `L`
 - [ ] **R-47** Split `pdf_generator.py` (660 lines): classic/modern templates ~80 % duplicated.
       1) shared body-builder + `_fmt`/`_fmt_date`/`_build_styles` → `pdf/layout.py`, template = style pack
-      · 2) `_add_qr_bill_page` → `pdf/qr_slip.py` · 3) thin dispatcher. Prereq for R-25 and R-68. — `H` / `L`
+      · 2) `_add_qr_bill_page` → `pdf/qr_slip.py` · 3) thin dispatcher. Prereq for R-101 (R-25 UI part done). — `H` / `L`
 - [ ] **R-85** Two sources of truth for API types: hand-written `frontend/src/types/index.ts` (209 lines)
       next to generated `api.generated.ts` (2,633 lines). Make `index.ts` re-export/alias from the
       generated file only; add `npm run generate-api` freshness check to CI. — `M` / `M`
@@ -105,8 +113,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ### UX / a11y / frontend ("dynamic, professional, user-friendly")
 
-- [ ] **R-24** Loading / empty / error states audit across all 10 pages. Known: `OnboardingGate`
-      returns `null` (blank screen) while fetching; verify `['settings']` invalidation in `Onboarding.tsx`. — `M` / `M`
 - [ ] **R-60** Live dashboard widgets: overdue aging, month revenue, open quotes — TanStack
       `refetchInterval` now, websocket later (P-03). — `M` / `M`
 - [ ] **R-62** Guided onboarding checklist on the dashboard (`onboarding_completed` exists). — `M` / `M`
@@ -114,9 +120,6 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 - [ ] **R-88** Client portal actions: accept/reject Offerte, see all documents of the client, not one
       token per document. Turns the portal from a download link into a product surface. — `M` / `L`
       `backend/app/api/portal.py` · `frontend/src/pages/Portal.tsx`
-- [ ] **R-25** i18n DE/EN first, FR/IT-ready — UI, PDF labels (after R-47), portal, emails. — `M` / `L`
-- [ ] **R-23** a11y pass: focus traps, ARIA on DataTable, keyboard path through DocumentForm;
-      axe-core in Playwright. — `M` / `L`
 - [ ] **R-29** Status history (JSONB, migration `f7978eefd0b8`) surfaced as a timeline in DocumentDetail. — `L` / `M`
 
 ### Testing & reliability
@@ -157,6 +160,45 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 
 ## ✅ Done
 
+- **R-23** ✅ 2026-09-11 — a11y pass: skip-to-content link, `<main id="main-content">`, nav landmarks with
+  `aria-current`; every icon-only button labelled, decorative icons `aria-hidden`; every input has a `<label>`
+  (`FormField` generates ids); tables carry `aria-label`, clickable rows expose a real `<Link>`; controlled
+  Radix dialogs return focus to their opener (they had no trigger to return to), `useFocusTrap()` for the
+  PDF preview panel and the command palette; `<html lang>` follows the locale. Contrast: `#2451e6` on white
+  6.19:1, white on dark brand 4.50:1; ⌘K hint and document tabs fixed from 4.43:1. `e2e/a11y.spec.ts` runs
+  `@axe-core/playwright` on login / dashboard / documents / editor and fails on serious+critical (plus skip
+  link, language switch, dialog focus trap). Playwright 1 → **7** specs. Open: R-102 (dark brand text).
+- **R-24** ✅ 2026-09-11 — `ErrorState` (message via `lib/errors.ts`, request id, retry) and `PageSkeleton`
+  (list / cards / detail / form / dashboard / settings, `role=status`) in `components/shared`; ad-hoc skeleton
+  stacks removed. `OnboardingGate` no longer blanks the screen and no longer unmounts the page tree on
+  background refetches. vitest 36 → **41**. Audit (✅ existed · ➕ added · — n/a):
+
+  | Page | loading before → after | empty before → after | error before → after |
+  |---|---|---|---|
+  | App `OnboardingGate` | `null` → ➕ PageSkeleton | — | ✗ → ➕ ErrorState + retry |
+  | Dashboard | ✅ inline skeletons → PageSkeleton | ✅ per widget | ✗ → ➕ |
+  | Clients | ✅ TableSkeleton | ✅ (now: no results vs. no clients yet) | ✗ → ➕ |
+  | ClientDetail | ✅ ad-hoc → PageSkeleton | ✅ not found / no documents (+ action) | ✗ → ➕ (client + documents) |
+  | Documents | ✅ TableSkeleton | ✅ (now: filter-aware, reset action) | ✗ → ➕ |
+  | DocumentDetail | ✅ ad-hoc → PageSkeleton | ✅ not found (+ back action) | ✗ → ➕ |
+  | DocumentForm (edit) | ✗ empty form → ➕ PageSkeleton | — | ✗ → ➕ |
+  | Settings | ✅ ad-hoc → PageSkeleton | — | ✗ → ➕ |
+  | Settings › Team | ✅ ad-hoc → PageSkeleton | ✗ → ➕ | ✗ → ➕ |
+  | Settings › Services | ✗ → ➕ TableSkeleton | ✅ plain text → EmptyState + action | ✗ → ➕ |
+  | Portal | ✅ ad-hoc → PageSkeleton | ✅ not found (404) | ✅ merged with 404 → ➕ separate, retry |
+  | Login / Onboarding | — (forms) | — | ✅ inline form error / toasts |
+- **R-25** ✅ 2026-09-11 — `frontend/src/lib/i18n.ts`: typed DE dictionary (source of truth) + EN, `t()`
+  with `{placeholders}`, locale store persisted in `localStorage` (`useSyncExternalStore`, no provider,
+  no dependency), DE default and fallback. `LanguageSwitcher` in the top bar, on login / onboarding /
+  portal and as a Settings tab. Every user-visible string in navigation, auth, dashboard, clients,
+  documents list / detail / editor, settings, portal, command palette and the shared components goes
+  through `useT()`. Playwright happy path drives the German default. vitest 21 → **36**. Backend
+  strings / PDF untouched → R-101.
+- **5.3 tokens** ✅ 2026-09-11 — `tokens.css` refreshed verbatim from the platform (brand `#2451e6`, dark
+  `#3b6cf6`); `index.css` maps `--primary`/`--ring`/`--sidebar-primary` (+fg), `--border`/`--input`,
+  `--background`/`--foreground`, `--muted-foreground`, `--destructive` to the tokens as HSL triplets with
+  the source hex in a comment (keeps `hsl(var(--x))` + opacity utilities). Tailwind gains `primary.hover`,
+  `primary.soft`, `success`, `warning`.
 - **R-84** ✅ 2026-09-10 — Scheduled jobs (overdue, recurring) live in `services/jobs.py`; `python -m app.jobs` is a dedicated runner (`--once` for a single pass, `JOBS_INTERVAL_SECONDS` loop otherwise). API runs them in-process only when `RUN_JOBS_IN_API=true` (default — local dev unchanged); compose sets it `false` on `backend` and adds a `jobs` service on the same image, so Docker has exactly one runner. Job pass runs in a thread, no longer on the event loop. README "Background jobs". Tests 112 → **116**.
 - **R-75** ✅ 2026-09-10 — `/api/health` contract: `status`, `version`, `database`, `migration`, `storage`, `jobs` (`in-api` | `worker`); `disk` only when `APP_ENV != production`. CI keys (`database`, `migration`) unchanged. Tests → **120**.
 - **R-67** ✅ 2026-09-10 — `send_document_email_endpoint` queues a frozen `DocumentEmail` dataclass (plain values, built in-request via `DocumentEmail.from_document`) instead of ORM instances; the background send needs no session, so no DetachedInstanceError after commit.
@@ -214,7 +256,7 @@ Rule: every PR names the R-ID it closes and which north-star column it serves.
 | 1 | Architecture & code quality | audit done (R-45), R-48 helpers ✅, R-66, R-67, R-73, R-68, R-35 ✅ · NEXT: R-96 → R-46 → R-47 → R-85 → R-86 |
 | 2 | Security & data protection | core done, R-83 step 1 + R-92b + R-75 ✅; open: R-15b, R-83b, R-53, R-65, R-76, R-55, R-56 |
 | 3 | Performance | R-84 ✅; open: R-26, R-58, R-82, R-59 |
-| 4 | UX / a11y / frontend | not started: R-24, R-60, R-62, R-61, R-88, R-25, R-23, R-29 |
-| 5 | Testing & reliability | R-21, R-22, R-49, R-51 ✅; open: R-52, R-57, R-98, R-99, R-100 |
+| 4 | UX / a11y / frontend | R-25, R-24, R-23 ✅ (2026-09-11); open: R-101, R-102, R-60, R-62, R-61, R-88, R-29 |
+| 5 | Testing & reliability | R-21, R-22, R-49, R-51 ✅, axe e2e (R-23) ✅; open: R-52, R-57, R-98, R-99, R-100 |
 | 6 | DX & tooling | CI/docker/scripts done; open: R-78, R-79, R-80, R-81, R-63, R-64, R-30 |
 | 4b | Observability | ✅ R-92, R-75, R-84 |

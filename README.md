@@ -14,6 +14,8 @@ Invoice and quote management software for **ChaDev** — built with FastAPI, Rea
 - **Inline Client Creation** — Add new clients directly from the document form (no page switching)
 - **Settings** — Tabbed layout: Company Info, Bank Details, Defaults, Services
 - **Dark/Light Mode** — Full theme support with toggle
+- **DE / EN interface** — German by default, English one click away (persisted per browser); PDFs stay German until R-101
+- **Accessible** — keyboard-navigable dialogs, labelled controls, skip link; axe-core gate in the Playwright suite
 
 ## Tech Stack
 
