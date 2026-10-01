@@ -121,7 +121,7 @@ jobs:
       # for anonymous clients. Authenticating with the workflow token avoids
       # the TOOMANYREQUESTS failures.
       - name: Log in to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
